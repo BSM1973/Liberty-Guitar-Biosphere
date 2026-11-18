@@ -17,7 +17,7 @@ Implemented:
 - New fixed-size midnight-blue/gold JUCE interface based on the approved screenshots.
 - Six independent engine panel classes (PulsePanel, HarmonicPanel, MutationPanel, ReactionPanel, MemoryPanel, EvolutionPanel).
 - Clicking the six ecosystem nodes switches the central engine panel.
-- Existing eight automatable DSP parameters remain reachable from appropriate knobs; controls without a DSP parameter are intentionally disabled.
+- Existing eleven automatable DSP parameters remain reachable from appropriate knobs; controls without a DSP parameter are intentionally disabled.
 - REACTION routes and shared analysis are currently **UI placeholders**, marked as such.
 - Standalone, JUCE-free DSP smoke tests, and cross-platform GitHub Actions builds.
 
