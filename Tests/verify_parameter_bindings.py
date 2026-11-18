@@ -55,6 +55,10 @@ for legacy in ("input", "output", "mix", "pulse", "harmonic", "mutation",
     assert legacy in registered, f"Legacy parameter ID was changed: {legacy}"
     assert f'value("{legacy}")' in processor, f"Legacy DSP parameter disconnected: {legacy}"
 
-assert 'value("global.bypass")' in processor or 'getRawParameterValue("global.bypass")' in processor
+assert (
+    'value("global.bypass")' in processor
+    or 'getRawParameterValue("global.bypass")' in processor
+    or 'enabled("global.bypass")' in processor
+), "Global bypass is no longer read from APVTS"
 print(f"APVTS mapping OK: {len(all_ids)} IDs, {len(panel_ids)} panel controls, "
       f"{len(global_ids)} master controls, 8 four-parameter routes.")
