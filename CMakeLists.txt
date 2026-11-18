@@ -53,8 +53,17 @@ target_sources(GuitarBiosphere PRIVATE
     Source/PluginProcessor.h
     Source/PluginEditor.cpp
     Source/PluginEditor.h
+    Source/Ui/BiosphereTheme.h
+    Source/Ui/EnginePanels.h
+    Source/Ui/EnginePanels.cpp
+    Source/Ui/EcosystemView.h
+    Source/Ui/EcosystemView.cpp
     Source/Dsp/BiosphereDSP.h
 )
+
+if(MSVC)
+    target_compile_options(GuitarBiosphere PRIVATE /utf-8)
+endif()
 
 target_compile_definitions(GuitarBiosphere PRIVATE
     JUCE_WEB_BROWSER=0
