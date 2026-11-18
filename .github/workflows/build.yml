@@ -23,6 +23,8 @@ jobs:
         run: c++ -std=c++20 -O2 -Wall -Wextra -Werror -ISource Tests/DspSmoke.cpp -o biosphere-dsp-tests
       - name: Run DSP test
         run: ./biosphere-dsp-tests
+      - name: Audit all APVTS IDs and UI attachments
+        run: python3 Tests/verify_parameter_bindings.py
 
   macos:
     name: macOS ARM64 (AU + VST3)

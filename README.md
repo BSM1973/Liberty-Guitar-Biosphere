@@ -3,7 +3,7 @@
 
 Native C++20 / JUCE 8 guitar audio-effect plugin for macOS (AU / VST3) and Windows (VST3).
 
-## Development status — Phase 1
+## Development status — Phase 2
 
 This is an **early functional DSP foundation**, not a finished commercial product.
 
@@ -13,12 +13,17 @@ Implemented:
 - **MUTATION**: live dual-grain overlap processing with a circular audio buffer.
 - **MEMORY**: transient-triggered ghost fragments, repeated with fading feedback.
 - Mono and stereo processing, bounded wet mix and output protection.
-- 11 automatable parameters with persistent host session state.
+- **97 stable APVTS parameters**, including the 11 original host IDs unchanged for existing sessions.
+- Six panels have working host-automatable Slider / ComboBox / Button attachments.
+- **8 REACTION routes** expose on/off, source, destination and bipolar amount (32 APVTS parameters).
+- All 4 macros, 6 master knobs, engine enable switches and 3 global switches are attached.
+- Global bypass is wired to a real dry-through path; setting/restore via APVTS is implemented.
+- GitHub CI audits parameter IDs and UI attachment coverage.
 - New fixed-size midnight-blue/gold JUCE interface based on the approved screenshots.
 - Six independent engine panel classes (PulsePanel, HarmonicPanel, MutationPanel, ReactionPanel, MemoryPanel, EvolutionPanel).
 - Clicking the six ecosystem nodes switches the central engine panel.
-- Existing eleven automatable DSP parameters remain reachable from appropriate knobs; controls without a DSP parameter are intentionally disabled.
-- REACTION routes and shared analysis are currently **UI placeholders**, marked as such.
+- Existing DSP controls stay connected using their original parameter IDs. New control values are host-automatable and saved, but most do not alter audio until the subsequent DSP integration.
+- REACTION route controls are now fully editable and saved as parameters, although the modulation engine is pending. Shared analysis is still a UI placeholder.
 - Standalone, JUCE-free DSP smoke tests, and cross-platform GitHub Actions builds.
 
 Not yet implemented:
@@ -29,7 +34,7 @@ Not yet implemented:
 
 No feature listed above as pending is represented as complete in the UI.
 
-## Interface — phase 1
+## UI/APVTS — phase 2
 
 The **old editor has been fully replaced** (not layered under a static screenshot).
 The approved midnight/gold visual language is rendered by JUCE components and vector graphics.
@@ -37,9 +42,18 @@ The approved midnight/gold visual language is rendered by JUCE components and ve
 Layout: top header, ecosystem node navigation, analysis area, one of six parameter panels,
 four macros and master bus. No scrollbars and no editor resizing (1200 × 748).
 
-This is an **interface-only milestone**. The full APVTS parameter mapping, real-time analysis,
-browser and 100 factory presets are separate tasks. Disabled controls are deliberate:
-they must never pretend to affect audio.
+This is an **APVTS/automation milestone**. All audio-control knobs, combo menus,
+engine enable buttons, macros, master switches and eight route editors have stable parameter IDs
+and DAW state recall. The actual modulation behaviors of REACTION, EVOLUTION and new advanced
+settings still require DSP development. The preset browser navigation and FR/EN localization
+remain disabled: those are application workflows, not host audio parameters.
+
+The 11 legacy IDs are retained unchanged (input, output, mix, pulse, harmonic, mutation,
+memory, rate, root, grain, feedback) so old DAW project state can still recall them.
+
+**Phase 2 verification:** the Linux CI step runs Tests/verify_parameter_bindings.py,
+checking 97 unique IDs, 46 panel controls, 10 master knobs and all eight four-parameter routes.
+Cross-platform build jobs verify the JUCE attachment code compiles.
 
 ## Building
 

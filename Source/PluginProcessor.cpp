@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "Parameters/BiosphereParameters.h"
 #include <cmath>
 
 GuitarBiosphereAudioProcessor::GuitarBiosphereAudioProcessor()
@@ -13,25 +14,7 @@ GuitarBiosphereAudioProcessor::GuitarBiosphereAudioProcessor()
 juce::AudioProcessorValueTreeState::ParameterLayout
 GuitarBiosphereAudioProcessor::makeParameterLayout()
 {
-    std::vector<std::unique_ptr<juce::RangedAudioParameter>> values;
-    auto add = [&](const char* id, const char* label, float min, float max, float step, float initial)
-    {
-        values.push_back(std::make_unique<juce::AudioParameterFloat>(
-            juce::ParameterID(id, 1), label, juce::NormalisableRange<float>(min, max, step), initial));
-    };
-
-    add("input", "Input (dB)", -24.0f, 18.0f, 0.1f, 0.0f);
-    add("output", "Output (dB)", -24.0f, 12.0f, 0.1f, 0.0f);
-    add("mix", "Master Mix", 0.0f, 1.0f, 0.01f, 0.65f);
-    add("pulse", "Pulse", 0.0f, 1.0f, 0.01f, 0.35f);
-    add("harmonic", "Harmonic Life", 0.0f, 1.0f, 0.01f, 0.30f);
-    add("mutation", "Mutation", 0.0f, 1.0f, 0.01f, 0.20f);
-    add("memory", "Memory", 0.0f, 1.0f, 0.01f, 0.20f);
-    add("rate", "Pulse Rate (Hz)", 0.1f, 12.0f, 0.1f, 2.0f);
-    add("root", "Resonance Root (Hz)", 40.0f, 500.0f, 1.0f, 110.0f);
-    add("grain", "Grain Length (ms)", 35.0f, 220.0f, 1.0f, 95.0f);
-    add("feedback", "Memory Feedback", 0.0f, 0.95f, 0.01f, 0.40f);
-    return { values.begin(), values.end() };
+    return biosphere::params::createLayout();
 }
 
 bool GuitarBiosphereAudioProcessor::isBusesLayoutSupported(const BusesLayout& layout) const
@@ -60,6 +43,11 @@ void GuitarBiosphereAudioProcessor::processBlock(juce::AudioBuffer<float>& buffe
     for (int channel = channels; channel < buffer.getNumChannels(); ++channel)
         buffer.clear(channel, 0, samples);
     if (channels < 1 || samples == 0)
+        return;
+
+    // Global bypass is already implemented in Phase 2:
+    // no DSP is called, the original input passes unchanged.
+    if (parameters.getRawParameterValue("global.bypass")->load() >= 0.5f)
         return;
 
     auto value = [&](const char* name) { return parameters.getRawParameterValue(name)->load(); };

@@ -38,24 +38,38 @@ GuitarBiosphereAudioProcessorEditor::GuitarBiosphereAudioProcessorEditor(
     for (auto* inactive : { &previous_, &next_, &library_, &french_, &english_ })
         inactive->setEnabled(false);
 
-    initialiseGlobalControl(0, "Croissance", "", 0, 1, 0.35f, " %");
-    initialiseGlobalControl(1, "Mouvement", "", 0, 1, 0.35f, " %");
-    initialiseGlobalControl(2, "Espace", "", 0, 1, 0.50f, " %");
-    initialiseGlobalControl(3, juce::String::fromUTF8("Énergie"), "", 0, 1, 0.35f, " %");
+    initialiseGlobalControl(0, "Croissance", "macro.growth", 0, 1, 0.35f, " %");
+    initialiseGlobalControl(1, "Mouvement", "macro.motion", 0, 1, 0.35f, " %");
+    initialiseGlobalControl(2, "Espace", "macro.space", 0, 1, 0.50f, " %");
+    initialiseGlobalControl(3, juce::String::fromUTF8("Énergie"), "macro.energy", 0, 1, 0.35f, " %");
     initialiseGlobalControl(4, juce::String::fromUTF8("Entrée"), "input", -24, 18, 0, " dB");
     initialiseGlobalControl(5, "Sortie", "output", -24, 12, 0, " dB");
     initialiseGlobalControl(6, "Mix maître", "mix", 0, 1, 0.65f, " %");
-    initialiseGlobalControl(7, juce::String::fromUTF8("Intensité globale"), "", 0, 1, 0.50f, " %");
-    initialiseGlobalControl(8, "Vitesse globale", "", 0.25f, 4.0f, 1.0f, " x");
-    initialiseGlobalControl(9, "Largeur stéréo", "", 0, 1, 0.80f, " %");
+    initialiseGlobalControl(7, juce::String::fromUTF8("Intensité globale"), "global.intensity", 0, 1, 0.50f, " %");
+    initialiseGlobalControl(8, "Vitesse globale", "global.speed", 0.25f, 4.0f, 1.0f, " x");
+    initialiseGlobalControl(9, "Largeur stéréo", "global.width", 0, 1, 0.80f, " %");
 
     for (auto* button : { &sync_, &freeze_, &bypass_ })
     {
         button->setColour(juce::TextButton::buttonColourId, raised);
         button->setColour(juce::TextButton::textColourOffId, white);
-        button->setEnabled(false); // Visual shell only; no fake toggling.
+        button->setClickingTogglesState(true);
+        button->setColour(juce::TextButton::buttonOnColourId, gold.darker(0.65f));
         addAndMakeVisible(button);
     }
+    sync_.setToggleState(true, juce::dontSendNotification);
+    freeze_.setToggleState(false, juce::dontSendNotification);
+    bypass_.setToggleState(false, juce::dontSendNotification);
+
+    sync_.setTooltip("Valeur APVTS sauvegardée. Synchronisation DSP complète à venir.");
+    freeze_.setTooltip("Valeur APVTS sauvegardée. Gel DSP complet à venir.");
+    bypass_.setTooltip("Bypass global actif : coupe le DSP et laisse passer le signal brut.");
+    syncAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+        processor_.parameters, "global.sync", sync_);
+    freezeAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+        processor_.parameters, "global.freeze", freeze_);
+    bypassAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+        processor_.parameters, "global.bypass", bypass_);
 
     selectEngine(1);
     setResizable(false, false);
@@ -95,14 +109,10 @@ void GuitarBiosphereAudioProcessorEditor::initialiseGlobalControl(
     };
     addAndMakeVisible(control.slider);
 
-    if (parameterId.isNotEmpty() && processor_.parameters.getParameter(parameterId))
-        control.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-            processor_.parameters, parameterId, control.slider);
-    else
-    {
-        control.slider.setEnabled(false);
-        control.slider.setTooltip("Macro ou paramètre global à raccorder dans la phase suivante.");
-    }
+    jassert(processor_.parameters.getParameter(parameterId) != nullptr);
+    control.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processor_.parameters, parameterId, control.slider);
+    control.slider.setTooltip("Automatisation et mémorisation APVTS : " + parameterId);
 }
 
 void GuitarBiosphereAudioProcessorEditor::selectEngine(int index)
@@ -174,7 +184,7 @@ void GuitarBiosphereAudioProcessorEditor::paint(juce::Graphics& g)
     g.setFont(juce::Font(juce::FontOptions(9.6f)));
     g.drawText("Votre guitare. Un univers sonore vivant.", 30, 724, 330, 18,
                juce::Justification::left);
-    g.drawText(juce::String::fromUTF8("Phase 1 — interface et navigation. DSP existant préservé."),
+    g.drawText(juce::String::fromUTF8("Phase 2 — paramètres automatisables et mémorisés · DSP partiel."),
                360, 724, 510, 18, juce::Justification::centred);
     g.setColour(gold);
     g.drawText("DSP & AIDE", 1060, 724, 110, 18, juce::Justification::centredRight);

@@ -51,6 +51,9 @@ private:
     juce::TextButton french_ { "FR" }, english_ { "EN" };
     juce::TextButton sync_ { "Synchro hôte" }, freeze_ { "Gel global" },
                      bypass_ { "Bypass global" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> syncAttachment_;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> freezeAttachment_;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAttachment_;
 
     int selectedEngine_ = 1;
 
