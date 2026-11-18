@@ -14,6 +14,11 @@ if(BUILD_TESTING)
     target_compile_features(BiosphereDSPTests PRIVATE cxx_std_20)
     add_test(NAME BiosphereDSPTests COMMAND BiosphereDSPTests)
 
+    add_executable(BiosphereDspRoutingTests Tests/DspRouting.cpp)
+    target_include_directories(BiosphereDspRoutingTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
+    target_compile_features(BiosphereDspRoutingTests PRIVATE cxx_std_20)
+    add_test(NAME BiosphereDspRoutingTests COMMAND BiosphereDspRoutingTests)
+
     add_executable(BiosphereNavigationTests Tests/NavigationSmoke.cpp)
     target_include_directories(BiosphereNavigationTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
     target_compile_features(BiosphereNavigationTests PRIVATE cxx_std_20)
