@@ -51,6 +51,7 @@ juce_generate_juce_header(GuitarBiosphere)
 target_sources(GuitarBiosphere PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginProcessor.h
+    Source/Parameters/BiosphereParameters.h
     Source/PluginEditor.cpp
     Source/PluginEditor.h
     Source/Ui/BiosphereTheme.h
