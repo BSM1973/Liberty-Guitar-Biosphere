@@ -45,6 +45,11 @@ void GuitarBiosphereAudioProcessor::processBlock(juce::AudioBuffer<float>& buffe
     if (channels < 1 || samples == 0)
         return;
 
+    // Global bypass is already implemented in Phase 2:
+    // no DSP is called, the original input passes unchanged.
+    if (parameters.getRawParameterValue("global.bypass")->load() >= 0.5f)
+        return;
+
     auto value = [&](const char* name) { return parameters.getRawParameterValue(name)->load(); };
     biosphere::Parameters p;
     p.inputGain = juce::Decibels::decibelsToGain(value("input"));
