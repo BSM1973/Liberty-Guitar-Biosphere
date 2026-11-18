@@ -40,17 +40,11 @@ EnginePanel::EnginePanel(juce::AudioProcessorValueTreeState& state, juce::String
             };
             addAndMakeVisible(slot->dial);
 
-            if (spec.parameterId.isNotEmpty() && state.getParameter(spec.parameterId) != nullptr)
-            {
-                slot->attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-                    state, spec.parameterId, slot->dial);
-            }
-            else
-            {
-                // Phase 1: visible, but intentionally not manipulable until its DSP parameter exists.
-                slot->dial.setEnabled(false);
-                slot->dial.setTooltip("Paramètre prévu pour la phase 2 : connexion au moteur DSP.");
-            }
+            jassert(state.getParameter(spec.parameterId) != nullptr);
+            slot->attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+                state, spec.parameterId, slot->dial);
+            slot->dial.setTooltip("Paramètre APVTS : " + spec.parameterId
+                + ". La liaison au traitement audio complet est prévue dans les phases DSP.");
         }
         else if (spec.kind == ControlKind::choice)
         {
@@ -58,18 +52,90 @@ EnginePanel::EnginePanel(juce::AudioProcessorValueTreeState& state, juce::String
                 slot->choice.addItem(spec.choices[i], i + 1);
             slot->choice.setSelectedId(1, juce::dontSendNotification);
             slot->choice.setJustificationType(juce::Justification::centred);
-            slot->choice.setEnabled(false);
-            slot->choice.setTooltip("Sélecteur à relier au DSP en phase 2.");
             addAndMakeVisible(slot->choice);
+            jassert(state.getParameter(spec.parameterId) != nullptr);
+            slot->choiceAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+                state, spec.parameterId, slot->choice);
         }
         else
         {
-            slot->toggle.setButtonText(spec.initial > 0.5f ? "Oui" : "Non");
-            slot->toggle.setEnabled(false);
-            slot->toggle.setTooltip("Interrupteur à relier au DSP en phase 2.");
+            slot->toggle.setButtonText("Oui / Non");
+            slot->toggle.setClickingTogglesState(true);
+            slot->toggle.setToggleState(spec.initial > 0.5f, juce::dontSendNotification);
+            slot->toggle.setColour(juce::TextButton::buttonOnColourId, gold.darker(0.65f));
             addAndMakeVisible(slot->toggle);
+            jassert(state.getParameter(spec.parameterId) != nullptr);
+            slot->buttonAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+                state, spec.parameterId, slot->toggle);
         }
+
         slots_.push_back(std::move(slot));
+    }
+
+    const juce::String activeId = (title_ == "PULSE") ? "pulse.active"
+        : (title_ == "HARMONIC LIFE") ? "harm.active"
+        : (title_ == "MUTATION") ? "mut.active"
+        : (title_ == "REACTION") ? "react.active"
+        : (title_ == "MEMORY") ? "mem.active" : "evo.active";
+    active_.setClickingTogglesState(true);
+    active_.setToggleState(true, juce::dontSendNotification);
+    active_.setColour(juce::TextButton::buttonOnColourId, gold.darker(0.68f));
+    active_.setColour(juce::TextButton::textColourOnId, white);
+    active_.setColour(juce::TextButton::buttonColourId, raised);
+    active_.setTooltip("Paramètre enregistré dans le projet. Activation DSP complète : phase ultérieure.");
+    addAndMakeVisible(active_);
+    jassert(state.getParameter(activeId) != nullptr);
+    activeAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+        state, activeId, active_);
+
+    if (title_ == "REACTION")
+    {
+        const juce::StringArray sourceNames {
+            "Attaque", "Enveloppe", "Pulse", "Harmonique",
+            "Mutation", "Mémoire", "Évolution", "Silence"
+        };
+        const juce::StringArray destinationNames {
+            "G·Densité", "P·Profondeur", "H·Mouvement", "M·Rappel",
+            "H·Résonance", "G·Mouvement", "M·Réinjection", "P·Cadence"
+        };
+        constexpr float amounts[] { .45f, .30f, .32f, .28f, .18f, .22f, .24f, -.25f };
+        for (int i = 0; i < 8; ++i)
+        {
+            auto route = std::make_unique<RouteControls>();
+            const auto prefix = "react.route" + juce::String(i + 1);
+            route->enabled.setButtonText("●");
+            route->enabled.setClickingTogglesState(true);
+            route->enabled.setToggleState(true, juce::dontSendNotification);
+            route->enabled.setColour(juce::TextButton::buttonColourId, raised);
+            route->enabled.setColour(juce::TextButton::buttonOnColourId, gold.darker(0.60f));
+            addAndMakeVisible(route->enabled);
+            for (int choice = 0; choice < sourceNames.size(); ++choice)
+                route->source.addItem(sourceNames[choice], choice + 1);
+            for (int choice = 0; choice < destinationNames.size(); ++choice)
+                route->destination.addItem(destinationNames[choice], choice + 1);
+            route->source.setSelectedId(i + 1, juce::dontSendNotification);
+            route->destination.setSelectedId(i + 1, juce::dontSendNotification);
+            addAndMakeVisible(route->source);
+            addAndMakeVisible(route->destination);
+            route->amount.setSliderStyle(juce::Slider::LinearHorizontal);
+            route->amount.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+            route->amount.setRange(-1, 1, 0.01);
+            route->amount.setValue(amounts[i], juce::dontSendNotification);
+            route->amount.setColour(juce::Slider::trackColourId, gold);
+            route->amount.setColour(juce::Slider::thumbColourId, white);
+            route->amount.setTooltip("Montant bipolaire -100 % à +100 % (automatisable).");
+            addAndMakeVisible(route->amount);
+
+            route->enabledAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+                state, prefix + ".active", route->enabled);
+            route->sourceAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+                state, prefix + ".source", route->source);
+            route->destinationAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+                state, prefix + ".destination", route->destination);
+            route->amountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+                state, prefix + ".amount", route->amount);
+            routes_[static_cast<std::size_t>(i)] = std::move(route);
+        }
     }
 }
 
@@ -87,57 +153,44 @@ void EnginePanel::paint(juce::Graphics& g)
     g.drawFittedText(summary_, 260, 12, getWidth() - 417, 28,
                      juce::Justification::centredLeft, 1);
 
-    auto status = juce::Rectangle<float>(static_cast<float>(getWidth() - 144), 11.0f, 124.0f, 29.0f);
-    g.setColour(dspAvailable_ ? raised.brighter(0.28f) : raised);
-    g.fillRoundedRectangle(status, 5.0f);
-    g.setColour(dspAvailable_ ? gold : muted);
-    g.drawRoundedRectangle(status, 5.0f, 1.0f);
-    g.setFont(juce::Font(juce::FontOptions(10.5f, juce::Font::bold)));
-    g.drawText(dspAvailable_ ? "DSP PARTIEL" : "À RELIER", status.toNearestInt(),
-               juce::Justification::centred);
-
     g.setColour(border.withAlpha(0.60f));
     g.drawLine(20.0f, 47.0f, static_cast<float>(getWidth() - 20), 47.0f, 0.9f);
 
-    // The eight REACTION routes are faithfully laid out but inactive until Phase 2/3.
     if (title_ == "REACTION")
     {
-        const int left = 448;
-        const int usableWidth = getWidth() - left - 25;
-        const int columnWidth = usableWidth / 2 - 7;
         g.setColour(muted);
         g.setFont(juce::Font(juce::FontOptions(10.0f, juce::Font::bold)));
-        g.drawText("ROUTES D'INTERACTION", left, 54, 240, 16, juce::Justification::left);
-        const juce::StringArray sources { "Attaque", "Enveloppe", "Pulse", "Harmonique",
-                                         "Mutation", "Mémoire", "Évolution", "Silence" };
-        const juce::StringArray destinations { "Grain", "Pulse", "Harmonique", "Mémoire",
-                                              "Résonance", "Mouvement", "Granulaire", "Pulse" };
-        for (int index = 0; index < 8; ++index)
+        g.drawText("ROUTES D'INTERACTION", 448, 54, 260, 16, juce::Justification::left);
+        const int columnWidth = (getWidth() - 448 - 25) / 2 - 7;
+        for (int i = 0; i < 8; ++i)
         {
-            const int column = index / 4;
-            const int row = index % 4;
-            const int xx = left + column * (columnWidth + 14);
-            const int yy = 73 + row * 31;
-            const auto frame = juce::Rectangle<float>(static_cast<float>(xx), static_cast<float>(yy),
-                                                      static_cast<float>(columnWidth), 27.0f);
-            g.setColour(raised.withAlpha(0.78f));
-            g.fillRoundedRectangle(frame, 4.0f);
-            g.setColour(border.withAlpha(0.85f));
-            g.drawRoundedRectangle(frame, 4.0f, 0.75f);
-            g.setColour(gold.withAlpha(0.70f));
-            g.setFont(juce::Font(juce::FontOptions(10.5f)));
-            g.drawText(juce::String(index + 1).paddedLeft('0', 2), xx + 7, yy + 3, 24, 21,
-                       juce::Justification::left);
-            g.setColour(white.withAlpha(0.72f));
-            g.drawFittedText(sources[index] + "    →    " + destinations[index],
-                             xx + 37, yy + 3, columnWidth - 44, 21,
-                             juce::Justification::centredLeft, 1);
+            const int x = 448 + (i / 4) * (columnWidth + 14);
+            const int y = 73 + (i % 4) * 31;
+            g.setColour(border.withAlpha(0.60f));
+            g.drawRoundedRectangle(static_cast<float>(x), static_cast<float>(y),
+                                   static_cast<float>(columnWidth), 27.0f, 4.0f, 0.75f);
         }
     }
 }
 
 void EnginePanel::resized()
 {
+    active_.setBounds(getWidth() - 144, 11, 124, 29);
+    if (title_ == "REACTION")
+    {
+        const int left = 448;
+        const int columnWidth = (getWidth() - left - 25) / 2 - 7;
+        for (int i = 0; i < 8; ++i)
+        {
+            auto& route = *routes_[static_cast<std::size_t>(i)];
+            const int x = left + (i / 4) * (columnWidth + 14);
+            const int y = 73 + (i % 4) * 31;
+            route.enabled.setBounds(x + 4, y + 3, 22, 21);
+            route.source.setBounds(x + 29, y + 3, 96, 21);
+            route.destination.setBounds(x + 138, y + 3, 98, 21);
+            route.amount.setBounds(x + 244, y + 3, columnWidth - 249, 21);
+        }
+    }
     const bool reaction = title_ == "REACTION";
     const int left = 19;
     const int usable = reaction ? 415 : getWidth() - left * 2;
@@ -166,76 +219,76 @@ void EnginePanel::resized()
 PulsePanel::PulsePanel(juce::AudioProcessorValueTreeState& state)
     : EnginePanel(state, "01", "PULSE", "Le geste devient rythme : attaques, pulsations et échos vivants.",
                   blue, {
-        ControlSpec::dial("Sensibilité", "", 0, 1, 0.55f, " %"),
+        ControlSpec::dial("Sensibilité", "pulse.sensitivity", 0, 1, 0.55f, " %"),
         ControlSpec::dial("Cadence libre", "rate", 0.1f, 12, 2, " Hz"),
-        ControlSpec::menu("Division", {"1/4", "1/8", "1/8T", "1/16", "1/16T"}),
+        ControlSpec::menu("Division", "pulse.division", {"1/4", "1/8", "1/8T", "1/16", "1/16T"}),
         ControlSpec::dial("Profondeur", "pulse", 0, 1, 0.35f, " %"),
-        ControlSpec::toggle("Synchro", true),
-        ControlSpec::dial("Swing", "", 0, 1, 0.08f, " %"),
-        ControlSpec::dial("Réinjection", "", 0, 1, 0.24f, " %"),
-        ControlSpec::dial("Largeur stéréo", "", 0, 1, 0.60f, " %"),
-        ControlSpec::dial("Dosage", "", 0, 1, 0.52f, " %")
+        ControlSpec::toggle("Synchro", "pulse.sync", true),
+        ControlSpec::dial("Swing", "pulse.swing", 0, 1, 0.08f, " %"),
+        ControlSpec::dial("Réinjection", "pulse.feedback", 0, 1, 0.24f, " %"),
+        ControlSpec::dial("Largeur stéréo", "pulse.width", 0, 1, 0.60f, " %"),
+        ControlSpec::dial("Dosage", "pulse.mix", 0, 1, 0.52f, " %")
     }, true) {}
 
 HarmonicPanel::HarmonicPanel(juce::AudioProcessorValueTreeState& state)
     : EnginePanel(state, "02", "HARMONIC LIFE", "Résonances harmoniques excitées par votre guitare.",
                   gold, {
         ControlSpec::dial("Fondamentale", "root", 40, 500, 165, " Hz"),
-        ControlSpec::menu("Harmoniques", {"Quintes", "Octaves", "Tierces", "Suspendues"}),
-        ControlSpec::dial("Résonance", "", 0, 1, 0.55f, " %"),
-        ControlSpec::dial("Déclin", "", 0.1f, 6, 2.4f, " s"),
-        ControlSpec::dial("Amortissement", "", 0, 1, 0.48f, " %"),
-        ControlSpec::dial("Mouvement", "", 0, 1, 0.18f, " %"),
-        ControlSpec::dial("Dispersion", "", 0, 1, 0.65f, " %"),
+        ControlSpec::menu("Harmoniques", "harm.mode", {"Quintes", "Octaves", "Tierces", "Suspendues"}),
+        ControlSpec::dial("Résonance", "harm.resonance", 0, 1, 0.55f, " %"),
+        ControlSpec::dial("Déclin", "harm.decay", 0.1f, 6, 2.4f, " s"),
+        ControlSpec::dial("Amortissement", "harm.damping", 0, 1, 0.48f, " %"),
+        ControlSpec::dial("Mouvement", "harm.motion", 0, 1, 0.18f, " %"),
+        ControlSpec::dial("Dispersion", "harm.spread", 0, 1, 0.65f, " %"),
         ControlSpec::dial("Dosage", "harmonic", 0, 1, 0.38f, " %"),
-        ControlSpec::toggle("Suivi mono")
+        ControlSpec::toggle("Suivi mono", "harm.mono")
     }, true) {}
 
 MutationPanel::MutationPanel(juce::AudioProcessorValueTreeState& state)
     : EnginePanel(state, "03", "MUTATION", "Des fragments de votre jeu se transforment en matière sonore.",
                   blue, {
         ControlSpec::dial("Taille du grain", "grain", 35, 220, 110, " ms"),
-        ControlSpec::dial("Densité", "", 1, 40, 12, " gr/s"),
-        ControlSpec::menu("Caractère", {"Organique", "Cristal", "Métallique", "Nuage"}),
-        ControlSpec::dial("Mouvement", "", 0, 1, 0.25f, " %"),
-        ControlSpec::dial("Hauteur", "", -12, 12, 0, " st"),
-        ControlSpec::dial("Aléatoire", "", 0, 1, 0.20f, " %"),
-        ControlSpec::dial("Stéréo", "", 0, 1, 0.65f, " %"),
+        ControlSpec::dial("Densité", "mut.density", 1, 40, 12, " gr/s"),
+        ControlSpec::menu("Caractère", "mut.character", {"Organique", "Cristal", "Métallique", "Nuage"}),
+        ControlSpec::dial("Mouvement", "mut.motion", 0, 1, 0.25f, " %"),
+        ControlSpec::dial("Hauteur", "mut.pitch", -12, 12, 0, " st"),
+        ControlSpec::dial("Aléatoire", "mut.random", 0, 1, 0.20f, " %"),
+        ControlSpec::dial("Stéréo", "mut.stereo", 0, 1, 0.65f, " %"),
         ControlSpec::dial("Dosage", "mutation", 0, 1, 0.28f, " %")
     }, true) {}
 
 ReactionPanel::ReactionPanel(juce::AudioProcessorValueTreeState& state)
     : EnginePanel(state, "04", "REACTION", "Huit interactions entre les moteurs.",
                   gold, {
-        ControlSpec::dial("Réactivité", "", 0, 1, 0.55f, " %"),
-        ControlSpec::dial("Interaction", "", 0, 1, 0.50f, " %"),
-        ControlSpec::dial("Sensibilité", "", 0, 1, 0.55f, " %"),
-        ControlSpec::dial("Réponse", "", 30, 500, 120, " ms"),
-        ControlSpec::dial("Complexité", "", 0, 1, 0.65f, " %")
+        ControlSpec::dial("Réactivité", "react.reactivity", 0, 1, 0.55f, " %"),
+        ControlSpec::dial("Interaction", "react.interaction", 0, 1, 0.50f, " %"),
+        ControlSpec::dial("Sensibilité", "react.sensitivity", 0, 1, 0.55f, " %"),
+        ControlSpec::dial("Réponse", "react.response", 30, 500, 120, " ms"),
+        ControlSpec::dial("Complexité", "react.complexity", 0, 1, 0.65f, " %")
     }, false) {}
 
 MemoryPanel::MemoryPanel(juce::AudioProcessorValueTreeState& state)
     : EnginePanel(state, "05", "MEMORY", "Votre jeu récent revient en fragments, souvenirs et notes fantômes.",
                   gold, {
-        ControlSpec::dial("Durée mémoire", "", 0.5f, 3.0f, 3.0f, " s"),
-        ControlSpec::dial("Capture", "", 0, 1, 0.80f, " %"),
-        ControlSpec::dial("Rappel", "", 0, 1, 0.48f, " %"),
-        ControlSpec::menu("Répétition", {"1/4", "1/8", "1/16", "Libre"}),
-        ControlSpec::dial("Inversion", "", 0, 1, 0.25f, " %"),
+        ControlSpec::dial("Durée mémoire", "mem.length", 0.5f, 3.0f, 3.0f, " s"),
+        ControlSpec::dial("Capture", "mem.capture", 0, 1, 0.80f, " %"),
+        ControlSpec::dial("Rappel", "mem.recall", 0, 1, 0.48f, " %"),
+        ControlSpec::menu("Répétition", "mem.repeat", {"1/4", "1/8", "1/16", "Libre"}),
+        ControlSpec::dial("Inversion", "mem.reverse", 0, 1, 0.25f, " %"),
         ControlSpec::dial("Réinjection", "feedback", 0, 0.95f, 0.40f, " %"),
-        ControlSpec::dial("Fondu", "", 5, 300, 45, " ms"),
+        ControlSpec::dial("Fondu", "mem.fade", 5, 300, 45, " ms"),
         ControlSpec::dial("Dosage", "memory", 0, 1, 0.30f, " %"),
-        ControlSpec::toggle("Gel mémoire")
+        ControlSpec::toggle("Gel mémoire", "mem.freeze")
     }, true) {}
 
 EvolutionPanel::EvolutionPanel(juce::AudioProcessorValueTreeState& state)
     : EnginePanel(state, "06", "EVOLUTION", "Un écosystème déterministe qui se développe avec votre jeu.",
                   blue, {
-        ControlSpec::dial("Cadence", "", 0.25f, 4, 1, " x"),
-        ControlSpec::dial("Intensité", "", 0, 1, 0.60f, " %"),
-        ControlSpec::dial("Sensibilité", "", 0, 1, 0.55f, " %"),
-        ControlSpec::dial("Stabilité", "", 0, 1, 0.65f, " %"),
-        ControlSpec::dial("Complexité", "", 0, 1, 0.65f, " %"),
-        ControlSpec::dial("Récupération", "", 0.25f, 10, 4, " s")
+        ControlSpec::dial("Cadence", "evo.rate", 0.25f, 4, 1, " x"),
+        ControlSpec::dial("Intensité", "evo.intensity", 0, 1, 0.60f, " %"),
+        ControlSpec::dial("Sensibilité", "evo.sensitivity", 0, 1, 0.55f, " %"),
+        ControlSpec::dial("Stabilité", "evo.stability", 0, 1, 0.65f, " %"),
+        ControlSpec::dial("Complexité", "evo.complexity", 0, 1, 0.65f, " %"),
+        ControlSpec::dial("Récupération", "evo.recovery", 0.25f, 10, 4, " s")
     }, false) {}
 } // namespace biosphere::ui
