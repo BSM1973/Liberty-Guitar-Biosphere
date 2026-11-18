@@ -3,7 +3,7 @@
 
 Native C++20 / JUCE 8 guitar audio-effect plugin for macOS (AU / VST3) and Windows (VST3).
 
-## Development status — Phase 2
+## Development status — Phase 3
 
 This is an **early functional DSP foundation**, not a finished commercial product.
 
@@ -21,7 +21,10 @@ Implemented:
 - GitHub CI audits parameter IDs and UI attachment coverage.
 - New fixed-size midnight-blue/gold JUCE interface based on the approved screenshots.
 - Six independent engine panel classes (PulsePanel, HarmonicPanel, MutationPanel, ReactionPanel, MemoryPanel, EvolutionPanel).
-- Clicking the six ecosystem nodes switches the central engine panel.
+- Six full-width **native JUCE button hotspots** (icon and label), mouse/keyboard accessible, switch exclusively to the corresponding parameter panel.
+- Last selected panel is serialized as UI-only session state and restored when reopening the plugin or DAW session.
+- Selection changes do not reconstruct or reset APVTS controls; per-engine parameter values are retained.
+- Independent navigation regression tests check all six node/panel mappings and invalid indices.
 - Existing DSP controls stay connected using their original parameter IDs. New control values are host-automatable and saved, but most do not alter audio until the subsequent DSP integration.
 - REACTION route controls are now fully editable and saved as parameters, although the modulation engine is pending. Shared analysis is still a UI placeholder.
 - Standalone, JUCE-free DSP smoke tests, and cross-platform GitHub Actions builds.
@@ -34,7 +37,7 @@ Not yet implemented:
 
 No feature listed above as pending is represented as complete in the UI.
 
-## UI/APVTS — phase 2
+## UI/navigation — phase 3
 
 The **old editor has been fully replaced** (not layered under a static screenshot).
 The approved midnight/gold visual language is rendered by JUCE components and vector graphics.
@@ -54,6 +57,10 @@ memory, rate, root, grain, feedback) so old DAW project state can still recall t
 **Phase 2 verification:** the Linux CI step runs Tests/verify_parameter_bindings.py,
 checking 97 unique IDs, 46 panel controls, 10 master knobs and all eight four-parameter routes.
 Cross-platform build jobs verify the JUCE attachment code compiles.
+
+**Phase 3 verification:** the Linux CI runs a JUCE-independent navigation C++ test and a
+source-contract check covering the six native click targets, exclusive panel visibility
+and persistence of the last selected engine. DAW visual validation remains necessary.
 
 ## Building
 
