@@ -64,9 +64,9 @@ GuitarBiosphereAudioProcessorEditor::GuitarBiosphereAudioProcessorEditor(
     freeze_.setToggleState(false, juce::dontSendNotification);
     bypass_.setToggleState(false, juce::dontSendNotification);
 
-    sync_.setTooltip("Valeur APVTS sauvegardée. Synchronisation DSP complète à venir.");
-    freeze_.setTooltip("Valeur APVTS sauvegardée. Gel DSP complet à venir.");
-    bypass_.setTooltip("Bypass global actif : coupe le DSP et laisse passer le signal brut.");
+    sync_.setTooltip("Synchronisation PULSE au tempo du DAW, lorsque le tempo hôte est disponible.");
+    freeze_.setTooltip("Fige le tampon MEMORY et conserve les fragments capturés.");
+    bypass_.setTooltip("Contourne le traitement avec un fondu court vers la guitare brute.");
     syncAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
         processor_.parameters, "global.sync", sync_);
     freezeAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
@@ -193,7 +193,7 @@ void GuitarBiosphereAudioProcessorEditor::paint(juce::Graphics& g)
     g.setFont(juce::Font(juce::FontOptions(9.6f)));
     g.drawText("Votre guitare. Un univers sonore vivant.", 30, 724, 330, 18,
                juce::Justification::left);
-    g.drawText(juce::String::fromUTF8("Phase 3 — navigation des six moteurs · DSP partiel."),
+    g.drawText(juce::String::fromUTF8("Phase 4 — moteurs, macros et bus maître raccordés au DSP."),
                360, 724, 510, 18, juce::Justification::centred);
     g.setColour(gold);
     g.drawText("DSP & AIDE", 1060, 724, 110, 18, juce::Justification::centredRight);
