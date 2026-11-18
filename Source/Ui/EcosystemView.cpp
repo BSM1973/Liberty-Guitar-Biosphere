@@ -4,6 +4,58 @@
 
 namespace biosphere::ui
 {
+void EcosystemView::Hotspot::paintButton(juce::Graphics& g, bool highlighted, bool down)
+{
+    if (!highlighted && !down && !hasKeyboardFocus(true))
+        return;
+
+    const auto area = getLocalBounds().toFloat().reduced(1.2f);
+    g.setColour(gold.withAlpha(down ? 0.20f : 0.075f));
+    g.fillRoundedRectangle(area, 8.0f);
+    g.setColour(gold.withAlpha(hasKeyboardFocus(true) ? 0.88f : 0.36f));
+    g.drawRoundedRectangle(area, 8.0f, hasKeyboardFocus(true) ? 1.25f : 0.75f);
+}
+
+EcosystemView::EcosystemView()
+{
+    for (int index = 0; index < EngineNavigationState::pageCount; ++index)
+    {
+        auto button = std::make_unique<Hotspot>(
+            juce::String::fromUTF8(enginePageNames[static_cast<std::size_t>(index)]));
+        button->setComponentID("engine-node-" + juce::String(index));
+        button->setTooltip("Afficher le panneau " +
+            juce::String::fromUTF8(enginePageNames[static_cast<std::size_t>(index)]));
+        button->setClickingTogglesState(true);
+        button->setWantsKeyboardFocus(true);
+        button->setMouseCursor(juce::MouseCursor::PointingHandCursor);
+        button->onClick = [this, index]
+        {
+            setSelectedEngine(index);
+            if (onEngineSelected)
+                onEngineSelected(index);
+        };
+        addAndMakeVisible(*button);
+        hotspots_[static_cast<std::size_t>(index)] = std::move(button);
+    }
+    setSelectedEngine(EngineNavigationState::defaultPage);
+}
+
+void EcosystemView::setSelectedEngine(int index)
+{
+    if (index < 0 || index >= EngineNavigationState::pageCount)
+        return;
+    selected_ = index;
+    for (int i = 0; i < EngineNavigationState::pageCount; ++i)
+        hotspots_[static_cast<std::size_t>(i)]->setToggleState(i == index, juce::dontSendNotification);
+    repaint();
+}
+
+void EcosystemView::resized()
+{
+    for (int i = 0; i < EngineNavigationState::pageCount; ++i)
+        hotspots_[static_cast<std::size_t>(i)]->setBounds(getNodeHitBox(i).toNearestInt());
+}
+
 juce::Point<float> EcosystemView::getNodeCentre(int index) const
 {
     const float width = static_cast<float>(getWidth());
@@ -71,9 +123,6 @@ void EcosystemView::paint(juce::Graphics& g)
     g.drawLine(centre.x - 17.0f, centre.y + 21.0f,
                centre.x + 17.0f, centre.y + 21.0f, 2.0f);
 
-    const std::array<juce::String, 6> names {
-        "PULSE", "HARMONIC LIFE", "MUTATION", "EVOLUTION", "MEMORY", "REACTION"
-    };
     for (int i = 0; i < 6; ++i)
     {
         const auto p = getNodeCentre(i);
@@ -139,33 +188,12 @@ void EcosystemView::paint(juce::Graphics& g)
 
         g.setColour(i == selected_ ? gold : white.withAlpha(0.86f));
         g.setFont(juce::Font(juce::FontOptions(11.0f, juce::Font::bold)));
-        g.drawText(names[static_cast<std::size_t>(i)], static_cast<int>(p.x - 80.0f),
+        g.drawText(juce::String::fromUTF8(enginePageNames[static_cast<std::size_t>(i)]), static_cast<int>(p.x - 80.0f),
                    static_cast<int>(p.y + 26.0f), 160, 18, juce::Justification::centred);
     }
     g.setColour(muted.withAlpha(0.75f));
     g.setFont(juce::Font(juce::FontOptions(10.0f)));
     g.drawText("8 routes à connecter", 20, getHeight() - 24, 170, 17, juce::Justification::left);
-}
-
-void EcosystemView::mouseDown(const juce::MouseEvent& event)
-{
-    for (int i = 0; i < 6; ++i)
-    {
-        if (getNodeHitBox(i).contains(event.position))
-        {
-            setSelectedEngine(i);
-            if (onEngineSelected) onEngineSelected(i);
-            return;
-        }
-    }
-}
-
-void EcosystemView::mouseMove(const juce::MouseEvent& event)
-{
-    bool overNode = false;
-    for (int i = 0; i < 6; ++i)
-        overNode = overNode || getNodeHitBox(i).contains(event.position);
-    setMouseCursor(overNode ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
 }
 
 void AnalysisPanel::paint(juce::Graphics& g)
