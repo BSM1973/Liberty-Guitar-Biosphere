@@ -317,7 +317,7 @@ public:
                         ? 0.20f * p.pulseWidth : 0.0f;
                     const float position = std::fmod(pulsePosition + stereoPhase, 1.0f);
                     const float wave = 0.5f - 0.5f * std::cos(static_cast<float>(twoPi) * position);
-                    const float dynamic = 0.22f + 0.78f * std::clamp(envelope_ * 4.0f, 0.0f, 1.0f);
+                    const float dynamic = 0.22f + 0.78f * std::clamp(envelope_ * 4.0f * (0.4f + p.pulseSensitivity * 1.3f), 0.0f, 1.0f);
                     pulseDelta = p.pulse * p.pulseMix *
                         (-dry[ch] * dynamic * (1.0f - wave) + delayed * p.pulseFeedback * 0.25f);
                 }
