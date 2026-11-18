@@ -3,7 +3,7 @@
 
 Native C++20 / JUCE 8 guitar audio-effect plugin for macOS (AU / VST3) and Windows (VST3).
 
-## Development status — Phase 3
+## Development status — Phase 4
 
 This is an **early functional DSP foundation**, not a finished commercial product.
 
@@ -25,7 +25,13 @@ Implemented:
 - Last selected panel is serialized as UI-only session state and restored when reopening the plugin or DAW session.
 - Selection changes do not reconstruct or reset APVTS controls; per-engine parameter values are retained.
 - Independent navigation regression tests check all six node/panel mappings and invalid indices.
-- Existing DSP controls stay connected using their original parameter IDs. New control values are host-automatable and saved, but most do not alter audio until the subsequent DSP integration.
+- The existing four native audio engines now read their APVTS controls in the processor and produce measurable parameter-dependent audio.
+- PULSE: intensity, sensitivity, synced/free tempo, swing, feedback delay, stereo modulation, independent mix and enable.
+- HARMONIC LIFE: mode, root, resonance, decay, damping, motion, spread and conservative monophonic tracking.
+- MUTATION: grain size, density, character, pitch, motion, randomness and stereo variation.
+- MEMORY: recall duration, capture sensitivity, repeat rate, reverse blend, feedback, fade, freeze, independent mix and enable.
+- Four live performance macros (GROWTH, MOTION, SPACE, ENERGY) change multiple engine parameters without overwriting stored APVTS values.
+- Master bus: smoothed input/output gain, dry/wet, intensity, speed, processed stereo width, host BPM sync, global memory freeze and smooth raw bypass.
 - REACTION route controls are now fully editable and saved as parameters, although the modulation engine is pending. Shared analysis is still a UI placeholder.
 - Standalone, JUCE-free DSP smoke tests, and cross-platform GitHub Actions builds.
 
@@ -36,6 +42,31 @@ Not yet implemented:
 - Production-level audio validation and signed/notarized installers.
 
 No feature listed above as pending is represented as complete in the UI.
+
+## DSP, macros and master bus — phase 4
+
+The existing four DSP engines have **real mappings** from APVTS parameters. Only these four
+produce audio today. REACTION and EVOLUTION retain automated/stored settings but their
+modulation/state engines still require implementation; they do not yet change sound.
+
+DSP mappings:
+
+- **GROWTH:** harmonic decay and MEMORY recall
+- **MOTION:** PULSE speed and MUTATION density/motion
+- **SPACE:** processed stereo width, harmonic spread and grain stereo movement
+- **ENERGY:** PULSE/harmonic/MUTATION/MEMORY intensity and PULSE responsiveness
+- **GLOBAL INTENSITY:** scales total wet engine contribution, preserving dry input
+- **GLOBAL SPEED:** multiplies free-running or DAW-synced PULSE frequency
+- **GLOBAL WIDTH:** applies mid/side width only to the wet difference, preserving dry stereo
+- **GLOBAL FREEZE:** holds MEMORY's capture buffer and continuously replays captured material
+- **GLOBAL BYPASS:** short smoothed crossfade to unprocessed raw input, avoiding a hard toggle
+- **HOST SYNC:** reads BPM from JUCE host position only if available; uses free rate otherwise
+
+A JUCE-independent DSP test and a processor mapping audit now run under GitHub Actions.
+All allocation happens in `prepare()`, not `process()`. Onset tracking and modulation
+are lightweight and deliberately approximate; no claim of perfect polyphonic tracking.
+Memory uses bounded 12-second preallocated circular buffers to avoid overwriting
+3-second fragments before their third replay.
 
 ## UI/navigation — phase 3
 
