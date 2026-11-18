@@ -13,7 +13,7 @@ GuitarBiosphereAudioProcessorEditor::GuitarBiosphereAudioProcessorEditor(
 {
     setLookAndFeel(&theme_);
 
-    pages_ = { &pulse_, &harmonic_, &mutation_, &reaction_, &memory_, &evolution_ };
+    pages_ = { &pulse_, &harmonic_, &mutation_, &evolution_, &memory_, &reaction_ };
     for (auto* panel : pages_)
         addAndMakeVisible(*panel);
 
