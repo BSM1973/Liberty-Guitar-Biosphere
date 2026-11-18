@@ -10,7 +10,7 @@ juce::Point<float> EcosystemView::getNodeCentre(int index) const
     const float height = static_cast<float>(getHeight());
     const std::array<float, 6> horizontal { 0.305f, 0.525f, 0.745f,
                                             0.305f, 0.525f, 0.745f };
-    const float vertical = index < 3 ? 0.31f : 0.75f;
+    const float vertical = index < 3 ? 0.26f : 0.76f;
     return { width * horizontal[static_cast<std::size_t>(index)], height * vertical };
 }
 
@@ -26,11 +26,11 @@ void EcosystemView::paint(juce::Graphics& g)
     heading(g, juce::String::fromUTF8("ÉCOSYSTÈME"), { 20, 13, 220, 25 }, 13.0f, white);
     g.setColour(muted);
     g.setFont(juce::Font(juce::FontOptions(11.0f)));
-    g.drawText("Choisissez un moteur", 20, 36, 240, 17, juce::Justification::left);
+    g.drawText("Choisissez un moteur", 20, 36, 175, 17, juce::Justification::left);
 
     const float w = static_cast<float>(getWidth());
     const float h = static_cast<float>(getHeight());
-    const juce::Point<float> centre { w * 0.525f, h * 0.53f };
+    const juce::Point<float> centre { w * 0.525f, h * 0.51f };
 
     juce::ColourGradient halo(blue.withAlpha(0.21f), centre.x, centre.y,
                               navy.withAlpha(0.0f), centre.x + w * 0.31f, centre.y, true);
@@ -53,23 +53,23 @@ void EcosystemView::paint(juce::Graphics& g)
 
     juce::ColourGradient hub(raised, centre.x, centre.y - 45.0f, navy, centre.x, centre.y + 45.0f, false);
     g.setGradientFill(hub);
-    g.fillEllipse(centre.x - 46.0f, centre.y - 46.0f, 92.0f, 92.0f);
+    g.fillEllipse(centre.x - 35.0f, centre.y - 35.0f, 70.0f, 70.0f);
     g.setColour(gold.withAlpha(0.65f));
     g.drawEllipse(centre.x - 46.0f, centre.y - 46.0f, 92.0f, 92.0f, 1.3f);
     g.setColour(blue.withAlpha(0.5f));
-    g.drawEllipse(centre.x - 40.0f, centre.y - 40.0f, 80.0f, 80.0f, 1.0f);
+    g.drawEllipse(centre.x - 29.0f, centre.y - 29.0f, 58.0f, 58.0f, 1.0f);
     g.setColour(muted);
     g.setFont(juce::Font(juce::FontOptions(9.0f, juce::Font::bold)));
     g.drawText(juce::String::fromUTF8("ÉTAT VIVANT"),
-               static_cast<int>(centre.x - 42), static_cast<int>(centre.y - 21), 84, 16,
+               static_cast<int>(centre.x - 34), static_cast<int>(centre.y - 19), 68, 16,
                juce::Justification::centred);
     g.setColour(white);
     g.setFont(juce::Font(juce::FontOptions(13.5f, juce::Font::bold)));
-    g.drawText("CALME", static_cast<int>(centre.x - 38), static_cast<int>(centre.y - 1),
-               76, 25, juce::Justification::centred);
+    g.drawText("CALME", static_cast<int>(centre.x - 31), static_cast<int>(centre.y - 2),
+               62, 24, juce::Justification::centred);
     g.setColour(gold);
-    g.drawLine(centre.x - 21.0f, centre.y + 24.0f,
-               centre.x + 21.0f, centre.y + 24.0f, 2.0f);
+    g.drawLine(centre.x - 17.0f, centre.y + 21.0f,
+               centre.x + 17.0f, centre.y + 21.0f, 2.0f);
 
     const std::array<juce::String, 6> names {
         "PULSE", "HARMONIC LIFE", "MUTATION", "EVOLUTION", "MEMORY", "REACTION"
@@ -78,7 +78,7 @@ void EcosystemView::paint(juce::Graphics& g)
     {
         const auto p = getNodeCentre(i);
         const auto accent = i == selected_ ? gold : ((i == 1 || i == 5) ? gold : blue);
-        const float radius = 23.0f;
+        const float radius = 19.0f;
         g.setColour(raised);
         g.fillEllipse(p.x - radius, p.y - radius, radius * 2.0f, radius * 2.0f);
         g.setColour(accent.withAlpha(i == selected_ ? 1.0f : 0.68f));
