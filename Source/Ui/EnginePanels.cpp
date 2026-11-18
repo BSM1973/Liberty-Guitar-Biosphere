@@ -43,8 +43,9 @@ EnginePanel::EnginePanel(juce::AudioProcessorValueTreeState& state, juce::String
             jassert(state.getParameter(spec.parameterId) != nullptr);
             slot->attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
                 state, spec.parameterId, slot->dial);
-            slot->dial.setTooltip("Paramètre APVTS : " + spec.parameterId
-                + ". La liaison au traitement audio complet est prévue dans les phases DSP.");
+            slot->dial.setTooltip("Paramètre : " + spec.parameterId
+                + (dspAvailable_ ? ". Contrôle le moteur DSP natif."
+                                 : ". Moteur de modulation à développer."));
         }
         else if (spec.kind == ControlKind::choice)
         {
@@ -82,7 +83,9 @@ EnginePanel::EnginePanel(juce::AudioProcessorValueTreeState& state, juce::String
     active_.setColour(juce::TextButton::buttonOnColourId, gold.darker(0.68f));
     active_.setColour(juce::TextButton::textColourOnId, white);
     active_.setColour(juce::TextButton::buttonColourId, raised);
-    active_.setTooltip("Paramètre enregistré dans le projet. Activation DSP complète : phase ultérieure.");
+    active_.setTooltip(dspAvailable_
+        ? "Active ou coupe ce moteur DSP (paramètre mémorisé et automatisable)."
+        : "Activé dans les réglages, moteur audio à développer.");
     addAndMakeVisible(active_);
     jassert(state.getParameter(activeId) != nullptr);
     activeAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
