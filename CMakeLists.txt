@@ -1,0 +1,70 @@
+cmake_minimum_required(VERSION 3.22)
+project(LibertyGuitarBiosphere VERSION 0.1.0 LANGUAGES C CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+include(CTest)
+
+# Unit tests for the JUCE-independent DSP core.
+if(BUILD_TESTING)
+    add_executable(BiosphereDSPTests Tests/DspSmoke.cpp)
+    target_include_directories(BiosphereDSPTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
+    target_compile_features(BiosphereDSPTests PRIVATE cxx_std_20)
+    add_test(NAME BiosphereDSPTests COMMAND BiosphereDSPTests)
+endif()
+
+include(FetchContent)
+FetchContent_Declare(
+    JUCE
+    GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
+    GIT_TAG 8.0.10
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(JUCE)
+
+if(APPLE)
+    set(BIOSPHERE_FORMATS AU VST3)
+else()
+    set(BIOSPHERE_FORMATS VST3)
+endif()
+
+juce_add_plugin(GuitarBiosphere
+    VERSION 0.1.0
+    COMPANY_NAME "Liberty Music Software"
+    BUNDLE_ID "com.libertymusicsoftware.guitarbiosphere"
+    PLUGIN_MANUFACTURER_CODE Lbms
+    PLUGIN_CODE GBio
+    PRODUCT_NAME "Guitar Biosphere"
+    IS_SYNTH FALSE
+    NEEDS_MIDI_INPUT FALSE
+    NEEDS_MIDI_OUTPUT FALSE
+    IS_MIDI_EFFECT FALSE
+    EDITOR_WANTS_KEYBOARD_FOCUS FALSE
+    COPY_PLUGIN_AFTER_BUILD FALSE
+    FORMATS ${BIOSPHERE_FORMATS}
+)
+
+juce_generate_juce_header(GuitarBiosphere)
+
+target_sources(GuitarBiosphere PRIVATE
+    Source/PluginProcessor.cpp
+    Source/PluginProcessor.h
+    Source/PluginEditor.cpp
+    Source/PluginEditor.h
+    Source/Dsp/BiosphereDSP.h
+)
+
+target_compile_definitions(GuitarBiosphere PRIVATE
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+    JUCE_VST3_CAN_REPLACE_VST2=0
+)
+
+target_link_libraries(GuitarBiosphere PRIVATE
+    juce::juce_audio_utils
+    juce::juce_dsp
+    juce::juce_recommended_config_flags
+    juce::juce_recommended_warning_flags
+)
