@@ -13,7 +13,10 @@ GuitarBiosphereAudioProcessorEditor::GuitarBiosphereAudioProcessorEditor(
 {
     setLookAndFeel(&theme_);
 
+    // Exact on-screen node order: top (Pulse, Harmonic, Mutation),
+    // then bottom (Evolution, Memory, Reaction).
     pages_ = { &pulse_, &harmonic_, &mutation_, &evolution_, &memory_, &reaction_ };
+    jassert(pages_.size() == static_cast<std::size_t>(biosphere::ui::EngineNavigationState::pageCount));
     for (auto* panel : pages_)
         addAndMakeVisible(*panel);
 
@@ -71,7 +74,7 @@ GuitarBiosphereAudioProcessorEditor::GuitarBiosphereAudioProcessorEditor(
     bypassAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
         processor_.parameters, "global.bypass", bypass_);
 
-    selectEngine(1);
+    selectEngine(processor_.getSelectedEditorPage());
     setResizable(false, false);
     setSize(1200, 748);
 }
@@ -117,10 +120,16 @@ void GuitarBiosphereAudioProcessorEditor::initialiseGlobalControl(
 
 void GuitarBiosphereAudioProcessorEditor::selectEngine(int index)
 {
-    selectedEngine_ = juce::jlimit(0, 5, index);
-    for (int i = 0; i < static_cast<int>(pages_.size()); ++i)
-        pages_[static_cast<std::size_t>(i)]->setVisible(i == selectedEngine_);
-    ecosystem_.setSelectedEngine(selectedEngine_);
+    if (!navigation_.select(index))
+        return;
+
+    // Exactly one engine panel is visible. No component is reconstructed,
+    // so all APVTS sliders/menus/buttons preserve their values and listeners.
+    for (int i = 0; i < biosphere::ui::EngineNavigationState::pageCount; ++i)
+        pages_[static_cast<std::size_t>(i)]->setVisible(navigation_.visible(i));
+
+    ecosystem_.setSelectedEngine(navigation_.selected());
+    processor_.setSelectedEditorPage(navigation_.selected());
 }
 
 void GuitarBiosphereAudioProcessorEditor::paint(juce::Graphics& g)
@@ -184,7 +193,7 @@ void GuitarBiosphereAudioProcessorEditor::paint(juce::Graphics& g)
     g.setFont(juce::Font(juce::FontOptions(9.6f)));
     g.drawText("Votre guitare. Un univers sonore vivant.", 30, 724, 330, 18,
                juce::Justification::left);
-    g.drawText(juce::String::fromUTF8("Phase 2 — paramètres automatisables et mémorisés · DSP partiel."),
+    g.drawText(juce::String::fromUTF8("Phase 3 — navigation des six moteurs · DSP partiel."),
                360, 724, 510, 18, juce::Justification::centred);
     g.setColour(gold);
     g.drawText("DSP & AIDE", 1060, 724, 110, 18, juce::Justification::centredRight);

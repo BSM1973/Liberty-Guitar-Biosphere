@@ -1,5 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
+#include <atomic>
+#include "Ui/EngineNavigation.h"
 #include "Dsp/BiosphereDSP.h"
 
 class GuitarBiosphereAudioProcessor final : public juce::AudioProcessor
@@ -34,9 +36,21 @@ public:
 
     juce::AudioProcessorValueTreeState parameters;
 
+    int getSelectedEditorPage() const noexcept
+    {
+        return selectedEditorPage_.load(std::memory_order_relaxed);
+    }
+
+    void setSelectedEditorPage(int index) noexcept
+    {
+        if (index >= 0 && index < biosphere::ui::EngineNavigationState::pageCount)
+            selectedEditorPage_.store(index, std::memory_order_relaxed);
+    }
+
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout makeParameterLayout();
     biosphere::BiosphereDSP dsp_;
+    std::atomic<int> selectedEditorPage_ { biosphere::ui::EngineNavigationState::defaultPage };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GuitarBiosphereAudioProcessor)
 };

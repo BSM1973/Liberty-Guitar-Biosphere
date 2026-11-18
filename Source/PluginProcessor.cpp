@@ -70,7 +70,10 @@ void GuitarBiosphereAudioProcessor::processBlock(juce::AudioBuffer<float>& buffe
 
 void GuitarBiosphereAudioProcessor::getStateInformation(juce::MemoryBlock& destination)
 {
-    if (auto xml = parameters.copyState().createXml())
+    auto state = parameters.copyState();
+    // UI-only selection; it must not become a host-automatable audio parameter.
+    state.setProperty("editorPage", getSelectedEditorPage(), nullptr);
+    if (auto xml = state.createXml())
         copyXmlToBinary(*xml, destination);
 }
 
@@ -79,7 +82,17 @@ void GuitarBiosphereAudioProcessor::setStateInformation(const void* data, int si
     if (auto xml = getXmlFromBinary(data, size))
     {
         if (xml->hasTagName(parameters.state.getType()))
-            parameters.replaceState(juce::ValueTree::fromXml(*xml));
+        {
+            auto restored = juce::ValueTree::fromXml(*xml);
+            // Older DAW sessions do not have editorPage and still open HARMONIC LIFE.
+            const int page = static_cast<int>(restored.getProperty(
+                "editorPage", biosphere::ui::EngineNavigationState::defaultPage));
+            if (page >= 0 && page < biosphere::ui::EngineNavigationState::pageCount)
+                setSelectedEditorPage(page);
+            else
+                setSelectedEditorPage(biosphere::ui::EngineNavigationState::defaultPage);
+            parameters.replaceState(restored);
+        }
     }
 }
 

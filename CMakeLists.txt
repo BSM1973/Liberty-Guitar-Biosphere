@@ -13,6 +13,11 @@ if(BUILD_TESTING)
     target_include_directories(BiosphereDSPTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
     target_compile_features(BiosphereDSPTests PRIVATE cxx_std_20)
     add_test(NAME BiosphereDSPTests COMMAND BiosphereDSPTests)
+
+    add_executable(BiosphereNavigationTests Tests/NavigationSmoke.cpp)
+    target_include_directories(BiosphereNavigationTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
+    target_compile_features(BiosphereNavigationTests PRIVATE cxx_std_20)
+    add_test(NAME BiosphereNavigationTests COMMAND BiosphereNavigationTests)
 endif()
 
 include(FetchContent)
@@ -57,6 +62,7 @@ target_sources(GuitarBiosphere PRIVATE
     Source/Ui/BiosphereTheme.h
     Source/Ui/EnginePanels.h
     Source/Ui/EnginePanels.cpp
+    Source/Ui/EngineNavigation.h
     Source/Ui/EcosystemView.h
     Source/Ui/EcosystemView.cpp
     Source/Dsp/BiosphereDSP.h
