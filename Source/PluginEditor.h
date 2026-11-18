@@ -7,6 +7,7 @@
 #include "Ui/BiosphereTheme.h"
 #include "Ui/EcosystemView.h"
 #include "Ui/EnginePanels.h"
+#include "Ui/EngineNavigation.h"
 
 class GuitarBiosphereAudioProcessorEditor final : public juce::AudioProcessorEditor
 {
@@ -55,7 +56,7 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> freezeAttachment_;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAttachment_;
 
-    int selectedEngine_ = 1;
+    biosphere::ui::EngineNavigationState navigation_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GuitarBiosphereAudioProcessorEditor)
 };
