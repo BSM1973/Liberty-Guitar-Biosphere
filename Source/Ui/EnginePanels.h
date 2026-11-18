@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include <memory>
+#include <array>
 #include <vector>
 #include "BiosphereTheme.h"
 
@@ -12,7 +13,7 @@ enum class ControlKind { knob, choice, switchButton };
 struct ControlSpec
 {
     juce::String name;
-    juce::String parameterId; // Existing APVTS ID, empty until Phase 2 for new parameters.
+    juce::String parameterId; // Stable host-automatable APVTS ID.
     ControlKind kind = ControlKind::knob;
     float min = 0.0f, max = 1.0f, initial = 0.5f;
     juce::String suffix = " %";
@@ -24,19 +25,21 @@ struct ControlSpec
         return { juce::String::fromUTF8(label), parameter, ControlKind::knob,
                  minimum, maximum, initialValue, juce::String::fromUTF8(unit), {} };
     }
-    static ControlSpec menu(const char* label, std::initializer_list<const char*> options)
+    static ControlSpec menu(const char* label, const char* parameter, std::initializer_list<const char*> options)
     {
         ControlSpec result;
         result.name = juce::String::fromUTF8(label);
+        result.parameterId = parameter;
         result.kind = ControlKind::choice;
         for (const auto* option : options)
             result.choices.add(juce::String::fromUTF8(option));
         return result;
     }
-    static ControlSpec toggle(const char* label, bool initiallyOn = false)
+    static ControlSpec toggle(const char* label, const char* parameter, bool initiallyOn = false)
     {
         ControlSpec result;
         result.name = juce::String::fromUTF8(label);
+        result.parameterId = parameter;
         result.kind = ControlKind::switchButton;
         result.initial = initiallyOn ? 1.0f : 0.0f;
         return result;
@@ -64,12 +67,27 @@ private:
         juce::ComboBox choice;
         juce::TextButton toggle;
         std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> choiceAttachment;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> buttonAttachment;
+    };
+
+    struct RouteControls
+    {
+        juce::TextButton enabled { "●" };
+        juce::ComboBox source, destination;
+        juce::Slider amount;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> enabledAttachment;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> sourceAttachment, destinationAttachment;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> amountAttachment;
     };
 
     juce::String number_, title_, summary_;
     juce::Colour accent_;
     bool dspAvailable_ = false;
     std::vector<std::unique_ptr<Slot>> slots_;
+    juce::TextButton active_ { "ACTIF" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> activeAttachment_;
+    std::array<std::unique_ptr<RouteControls>, 8> routes_ {};
 };
 
 class PulsePanel final : public EnginePanel
