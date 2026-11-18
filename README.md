@@ -14,16 +14,32 @@ Implemented:
 - **MEMORY**: transient-triggered ghost fragments, repeated with fading feedback.
 - Mono and stereo processing, bounded wet mix and output protection.
 - 11 automatable parameters with persistent host session state.
-- A preliminary fixed-size, graphite/emerald/copper JUCE editor.
+- New fixed-size midnight-blue/gold JUCE interface based on the approved screenshots.
+- Six independent engine panel classes (PulsePanel, HarmonicPanel, MutationPanel, ReactionPanel, MemoryPanel, EvolutionPanel).
+- Clicking the six ecosystem nodes switches the central engine panel.
+- Existing eight automatable DSP parameters remain reachable from appropriate knobs; controls without a DSP parameter are intentionally disabled.
+- REACTION routes and shared analysis are currently **UI placeholders**, marked as such.
 - Standalone, JUCE-free DSP smoke tests, and cross-platform GitHub Actions builds.
 
 Not yet implemented:
 - REACTION matrix and EVOLUTION ecosystem controller.
 - 100 factory presets, preset browser and user preset storage.
-- Full French/English interface switch.
+- Active French/English localization switch (FR displayed; EN currently disabled).
 - Production-level audio validation and signed/notarized installers.
 
 No feature listed above as pending is represented as complete in the UI.
+
+## Interface — phase 1
+
+The **old editor has been fully replaced** (not layered under a static screenshot).
+The approved midnight/gold visual language is rendered by JUCE components and vector graphics.
+
+Layout: top header, ecosystem node navigation, analysis area, one of six parameter panels,
+four macros and master bus. No scrollbars and no editor resizing (1200 × 748).
+
+This is an **interface-only milestone**. The full APVTS parameter mapping, real-time analysis,
+browser and 100 factory presets are separate tasks. Disabled controls are deliberate:
+they must never pretend to affect audio.
 
 ## Building
 
