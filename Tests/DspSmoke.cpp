@@ -32,14 +32,16 @@ std::vector<float> render(const std::vector<float>& source, biosphere::Parameter
     for (std::size_t offset = 0; offset < output.size(); offset += 256)
     {
         float* channels[] = { output.data() + offset };
-        engine.process(channels, 1, static_cast<int>(std::min<std::size_t>(256, output.size() - offset)), parameters);
+        engine.process(channels, 1,
+            static_cast<int>(std::min<std::size_t>(256, output.size() - offset)), parameters);
     }
     return output;
 }
 
-void verifyDifference(const char* name, const std::vector<float>& source, const std::vector<float>& processed)
+void verifyDifference(const char* name, const std::vector<float>& source,
+                      const std::vector<float>& processed)
 {
-    double difference = 0;
+    double difference = 0.0;
     for (std::size_t i = 0; i < source.size(); ++i)
     {
         if (!std::isfinite(processed[i]) || std::abs(processed[i]) > 1.001f)
@@ -47,8 +49,20 @@ void verifyDifference(const char* name, const std::vector<float>& source, const 
         difference += std::abs(source[i] - processed[i]);
     }
     if (difference < 0.1)
-        throw std::runtime_error(std::string(name) + ": no audible signal difference");
+        throw std::runtime_error(std::string(name) + ": no measurable signal difference");
     std::cout << name << ": PASS (difference=" << difference << ")\n";
+}
+
+void verifyDryTransparency(const std::vector<float>& source)
+{
+    biosphere::Parameters p;
+    p.mix = 1.0f;
+    p.pulse = p.harmonic = p.mutation = p.memory = 0.0f;
+    const auto dry = render(source, p);
+    for (std::size_t i = 0; i < dry.size(); ++i)
+        if (std::abs(dry[i] - source[i]) > 0.00001f)
+            throw std::runtime_error("Dry signal was modified");
+    std::cout << "Dry transparency: PASS\n";
 }
 } // namespace
 
@@ -57,27 +71,10 @@ int main()
     try
     {
         const auto source = makeGuitarLikeSignal();
+        verifyDryTransparency(source);
         biosphere::Parameters p;
         p.mix = 1.0f;
         p.pulse = p.harmonic = p.mutation = p.memory = 0.0f;
-        verifyDifference("dry reference", source, source); // special-cased below
-    }
-    catch (const std::exception&)
-    {
-        // The dry reference is intentionally identical. Test it explicitly.
-    }
-
-    try
-    {
-        const auto source = makeGuitarLikeSignal();
-        biosphere::Parameters p;
-        p.mix = 1.0f;
-        p.pulse = p.harmonic = p.mutation = p.memory = 0.0f;
-        const auto dry = render(source, p);
-        for (std::size_t i = 0; i < dry.size(); ++i)
-            if (std::abs(dry[i] - source[i]) > 0.00001f)
-                throw std::runtime_error("Dry signal was modified");
-
         p.pulse = 0.8f;
         verifyDifference("PULSE", source, render(source, p));
         p.pulse = 0.0f; p.harmonic = 0.7f;
