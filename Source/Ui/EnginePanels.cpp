@@ -102,7 +102,7 @@ void EnginePanel::paint(juce::Graphics& g)
     // The eight REACTION routes are faithfully laid out but inactive until Phase 2/3.
     if (title_ == "REACTION")
     {
-        const int left = 382;
+        const int left = 448;
         const int usableWidth = getWidth() - left - 25;
         const int columnWidth = usableWidth / 2 - 7;
         g.setColour(muted);
@@ -140,7 +140,7 @@ void EnginePanel::resized()
 {
     const bool reaction = title_ == "REACTION";
     const int left = 19;
-    const int usable = reaction ? 350 : getWidth() - left * 2;
+    const int usable = reaction ? 415 : getWidth() - left * 2;
     const int count = static_cast<int>(slots_.size());
     if (count == 0) return;
 
