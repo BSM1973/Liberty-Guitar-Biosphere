@@ -2,9 +2,13 @@ name: Native Builds and DSP Tests
 
 on:
   push:
-    branches: [main, "development/**"]
+    branches: [main]
   pull_request:
   workflow_dispatch:
+
+concurrency:
+  group: biosphere-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
