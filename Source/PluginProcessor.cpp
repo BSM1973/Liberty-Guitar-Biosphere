@@ -45,12 +45,13 @@ void GuitarBiosphereAudioProcessor::processBlock(juce::AudioBuffer<float>& buffe
     if (channels < 1 || samples == 0)
         return;
 
-    // Global bypass is already implemented in Phase 2:
-    // no DSP is called, the original input passes unchanged.
-    if (parameters.getRawParameterValue("global.bypass")->load() >= 0.5f)
-        return;
-
-    auto value = [&](const char* name) { return parameters.getRawParameterValue(name)->load(); };
+    // One atomic APVTS snapshot per host block; no allocations or locks.
+    // The legacy 11 parameter IDs must remain unchanged for DAW compatibility.
+    auto value = [&](const char* name) noexcept
+    {
+        return parameters.getRawParameterValue(name)->load(std::memory_order_relaxed);
+    };
+    auto enabled = [&](const char* id) noexcept { return value(id) >= 0.5f; };
     biosphere::Parameters p;
     p.inputGain = juce::Decibels::decibelsToGain(value("input"));
     p.outputGain = juce::Decibels::decibelsToGain(value("output"));
@@ -64,6 +65,65 @@ void GuitarBiosphereAudioProcessor::processBlock(juce::AudioBuffer<float>& buffe
     p.grainMs = value("grain");
     p.memoryFeedback = value("feedback");
 
+    p.globalIntensity = value("global.intensity");
+    p.globalSpeed = value("global.speed");
+    p.globalWidth = value("global.width");
+    p.globalSync = enabled("global.sync");
+    p.globalFreeze = enabled("global.freeze");
+    p.bypass = enabled("global.bypass");
+    p.macroGrowth = value("macro.growth");
+    p.macroMotion = value("macro.motion");
+    p.macroSpace = value("macro.space");
+    p.macroEnergy = value("macro.energy");
+
+    p.pulseActive = enabled("pulse.active");
+    p.pulseSensitivity = value("pulse.sensitivity");
+    p.pulseDivision = static_cast<int>(value("pulse.division"));
+    p.pulseSync = enabled("pulse.sync");
+    p.pulseSwing = value("pulse.swing");
+    p.pulseFeedback = value("pulse.feedback");
+    p.pulseWidth = value("pulse.width");
+    p.pulseMix = value("pulse.mix");
+
+    p.harmonicActive = enabled("harm.active");
+    p.harmonicMode = static_cast<int>(value("harm.mode"));
+    p.harmonicResonance = value("harm.resonance");
+    p.harmonicDecay = value("harm.decay");
+    p.harmonicDamping = value("harm.damping");
+    p.harmonicMotion = value("harm.motion");
+    p.harmonicSpread = value("harm.spread");
+    p.harmonicMono = enabled("harm.mono");
+
+    p.mutationActive = enabled("mut.active");
+    p.mutationDensity = value("mut.density");
+    p.mutationCharacter = static_cast<int>(value("mut.character"));
+    p.mutationMotion = value("mut.motion");
+    p.mutationPitch = value("mut.pitch");
+    p.mutationRandom = value("mut.random");
+    p.mutationStereo = value("mut.stereo");
+
+    p.memoryActive = enabled("mem.active");
+    p.memoryLength = value("mem.length");
+    p.memoryCapture = value("mem.capture");
+    p.memoryRecall = value("mem.recall");
+    p.memoryRepeat = static_cast<int>(value("mem.repeat"));
+    p.memoryReverse = value("mem.reverse");
+    p.memoryFade = value("mem.fade");
+    p.memoryFreeze = enabled("mem.freeze");
+
+    // The host tempo is applied only when the host actually supplies it.
+    // Otherwise the free-running rate remains in charge.
+    if (auto* playHead = getPlayHead())
+        if (auto position = playHead->getPosition())
+            if (auto bpm = position->getBpm())
+                if (std::isfinite(*bpm) && *bpm > 0)
+                {
+                    p.hasHostBpm = true;
+                    p.hostBpm = static_cast<float>(*bpm);
+                }
+
+    // REACTION/EVO parameters are stored by APVTS, but no corresponding
+    // modulation DSP exists yet. Do not pretend they affect audio.
     float* audio[2] = { buffer.getWritePointer(0), channels > 1 ? buffer.getWritePointer(1) : nullptr };
     dsp_.process(audio, channels, samples, p);
 }
