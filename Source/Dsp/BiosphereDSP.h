@@ -121,6 +121,7 @@ public:
         lastInput_ = 0.0f;
         zeroCrossCounter_ = 0;
         lastPeriod_ = 0;
+        noiseSeed_ = 0x8fe34ae1u;
         for (auto& channel : resonators_)
             for (auto& state : channel) state = {};
         for (auto& channel : grains_)
@@ -159,9 +160,12 @@ public:
         const double grainPitch = std::exp2(static_cast<double>(p.mutationPitch) / 12.0);
         const int captureLength = std::clamp(static_cast<int>(sampleRate_ * p.memoryLength),
                                              64, static_cast<int>(sampleRate_ * 3.0));
-        const int memoryWait = std::clamp(static_cast<int>(sampleRate_ * 60.0 / tempo
-                                        / (1 << std::min(3, p.memoryRepeat))),
-                                        64, static_cast<int>(sampleRate_ * 2.0));
+        constexpr std::array<float, 4> repeatDivisions { 1.0f, 2.0f, 4.0f, 1.0f };
+        const float repeatRate = p.memoryRepeat == 3
+            ? std::clamp(p.rateHz, 0.2f, 12.0f) : tempo / 60.0f
+                * repeatDivisions[static_cast<std::size_t>(p.memoryRepeat)];
+        const int memoryWait = std::clamp(static_cast<int>(sampleRate_ / repeatRate),
+                                        64, static_cast<int>(sampleRate_ * 3.0));
         const int fadeSamples = std::max(5, static_cast<int>(sampleRate_ * p.memoryFade * 0.001f));
         const int delaySamples = std::clamp(static_cast<int>(sampleRate_ / std::max(0.1f, rate)),
                                             64, static_cast<int>(pulseCapacity_ - 2));
@@ -232,9 +236,13 @@ public:
 
             if (onset && memoryCooldown_ == 0 && p.memoryActive && !freeze
                 && p.memory > 0.0001f && p.memoryCapture > 0.0001f
-                && processedSamples_ > static_cast<std::size_t>(captureLength + 16))
+                && level > threshold * (1.20f - 0.80f * p.memoryCapture)
+                && processedSamples_ > static_cast<std::size_t>(sampleRate_ * 0.35))
             {
-                memoryLength_ = captureLength;
+                // Early attacks can recall a shorter available history. No need
+                // to wait 3 seconds before the first audible memory fragment.
+                memoryLength_ = std::min(captureLength,
+                    static_cast<int>(processedSamples_ - 16));
                 memoryStart_ = (memoryWrite_ + memoryCapacity_
                                 - static_cast<std::size_t>(captureLength + 1)) % memoryCapacity_;
                 memoryAge_ = 0;
@@ -370,8 +378,6 @@ public:
                 {
                     const int position = memoryAge_ % memoryLength_;
                     const int repetition = memoryAge_ / memoryLength_;
-                    const float head = static_cast<float>(position)
-                        / static_cast<float>(memoryLength_);
                     const float up = std::min(1.0f, static_cast<float>(position)
                                                  / static_cast<float>(fadeSamples));
                     const float down = std::min(1.0f,
@@ -387,7 +393,6 @@ public:
                     const float gain = std::pow(p.memoryFeedback,
                         static_cast<float>(repetition % 3));
                     memoryDelta = echo * window * gain * p.memory * p.memoryRecall;
-                    (void) head;
                 }
 
                 delta[ch] = pulseDelta + harmonicDelta + mutationDelta + memoryDelta;
@@ -416,12 +421,13 @@ public:
                 const float processed = (dry[ch] + delta[ch] * smoothedMix_ * intensity)
                                           * smoothedOutput_;
                 // Crossfade to untreated input when bypassed, avoiding hard clicks.
-                const float output = raw[ch] + (processed - raw[ch]) * wetBypass_;
-                const float magnitude = std::abs(output);
-                const float limited = magnitude <= 0.95f ? output :
+                const float magnitude = std::abs(processed);
+                const float limited = magnitude <= 0.95f ? processed :
                     std::copysign(0.95f + 0.05f
-                          * std::tanh((magnitude - 0.95f) * 12.0f), output);
-                data[channel][sample] = std::isfinite(limited) ? limited : 0.0f;
+                          * std::tanh((magnitude - 0.95f) * 12.0f), processed);
+                // Bypassed audio is truly raw/unaltered after the short crossfade.
+                const float output = raw[ch] + (limited - raw[ch]) * wetBypass_;
+                data[channel][sample] = std::isfinite(output) ? output : 0.0f;
             }
 
             grainWrite_ = (grainWrite_ + 1) % grainCapacity_;
