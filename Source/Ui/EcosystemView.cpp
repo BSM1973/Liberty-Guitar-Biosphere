@@ -9,11 +9,15 @@ void EcosystemView::Hotspot::paintButton(juce::Graphics& g, bool highlighted, bo
     if (!highlighted && !down && !hasKeyboardFocus(true))
         return;
 
-    const auto area = getLocalBounds().toFloat().reduced(1.2f);
-    g.setColour(gold.withAlpha(down ? 0.20f : 0.075f));
-    g.fillRoundedRectangle(area, 8.0f);
-    g.setColour(gold.withAlpha(hasKeyboardFocus(true) ? 0.88f : 0.36f));
-    g.drawRoundedRectangle(area, 8.0f, hasKeyboardFocus(true) ? 1.25f : 0.75f);
+    // Preserve the reference UI: hover/focus highlights only the circular icon,
+    // never a large rectangle over the ecosystem orbit or its labels.
+    const float cx = getWidth() * 0.5f;
+    const float cy = 34.0f;
+    g.setColour(gold.withAlpha(down ? 0.30f : 0.10f));
+    g.fillEllipse(cx - 27.0f, cy - 27.0f, 54.0f, 54.0f);
+    g.setColour(gold.withAlpha(hasKeyboardFocus(true) ? 0.9f : 0.40f));
+    g.drawEllipse(cx - 27.0f, cy - 27.0f, 54.0f, 54.0f,
+                  hasKeyboardFocus(true) ? 1.5f : 1.0f);
 }
 
 EcosystemView::EcosystemView()
@@ -69,7 +73,7 @@ juce::Point<float> EcosystemView::getNodeCentre(int index) const
 juce::Rectangle<float> EcosystemView::getNodeHitBox(int index) const
 {
     const auto centre = getNodeCentre(index);
-    return { centre.x - 47.0f, centre.y - 34.0f, 94.0f, 78.0f };
+    return { centre.x - 82.0f, centre.y - 34.0f, 164.0f, 78.0f };
 }
 
 void EcosystemView::paint(juce::Graphics& g)
