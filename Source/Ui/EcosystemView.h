@@ -7,6 +7,7 @@
 #include "EngineNavigation.h"
 #include "BiosphereTheme.h"
 #include "Localization.h"
+#include "EcosystemLayout.h"
 
 namespace biosphere::ui
 {
@@ -29,7 +30,11 @@ private:
     class Hotspot final : public juce::TextButton
     {
     public:
-        explicit Hotspot(const juce::String& title) : juce::TextButton(title) {}
+        explicit Hotspot(const juce::String& title, int engineIndex)
+            : juce::TextButton(title), engineIndex_(engineIndex) {}
+        private:
+            int engineIndex_ = 0;
+        public:
         void paintButton(juce::Graphics&, bool highlighted, bool down) override;
     };
 

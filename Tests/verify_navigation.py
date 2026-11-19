@@ -35,4 +35,11 @@ for expected in [
 # Page preference stays UI-only and is recalled with existing DAW session state.
 assert 'state.setProperty("editorPage", getSelectedEditorPage(), nullptr)' in processor
 assert 'restored.getProperty(' in processor and '"editorPage"' in processor
+# Collision geometry must be shared by painting and hit-test regions.
+assert '#include "EcosystemLayout.h"' in header
+assert 'ecosystem_layout::node(' in ecosystem
+assert 'ecosystem_layout::hotspot(' in ecosystem
+assert 'ecosystem_layout::label(' in ecosystem
+assert 'ecosystem_layout::hub(' in ecosystem
+
 print("JUCE node-to-panel contract: PASS (6 accessible native nodes, persistent exclusive navigation)")

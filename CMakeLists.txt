@@ -24,6 +24,11 @@ if(BUILD_TESTING)
     target_compile_features(BiosphereAnalysisTests PRIVATE cxx_std_20)
     add_test(NAME BiosphereAnalysisTests COMMAND BiosphereAnalysisTests)
 
+    add_executable(BiosphereEcosystemLayoutTests Tests/EcosystemLayoutSmoke.cpp)
+    target_include_directories(BiosphereEcosystemLayoutTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
+    target_compile_features(BiosphereEcosystemLayoutTests PRIVATE cxx_std_20)
+    add_test(NAME BiosphereEcosystemLayoutTests COMMAND BiosphereEcosystemLayoutTests)
+
     add_executable(BiosphereNavigationTests Tests/NavigationSmoke.cpp)
     target_include_directories(BiosphereNavigationTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
     target_compile_features(BiosphereNavigationTests PRIVATE cxx_std_20)
@@ -78,6 +83,7 @@ target_sources(GuitarBiosphere PRIVATE
     Source/Ui/EnginePanels.h
     Source/Ui/EnginePanels.cpp
     Source/Ui/EngineNavigation.h
+    Source/Ui/EcosystemLayout.h
     Source/Ui/EcosystemView.h
     Source/Ui/EcosystemView.cpp
     Source/Dsp/BiosphereDSP.h

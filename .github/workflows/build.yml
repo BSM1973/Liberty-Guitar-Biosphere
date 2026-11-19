@@ -35,6 +35,10 @@ jobs:
         run: python3 Tests/verify_phase5.py
       - name: Audit UI encoding and accented strings
         run: python3 Tests/verify_utf8.py
+      - name: Check six ecosystem labels and central state never overlap
+        run: |
+          c++ -std=c++20 -O2 -Wall -Wextra -Werror -ISource Tests/EcosystemLayoutSmoke.cpp -o biosphere-layout-tests
+          ./biosphere-layout-tests
       - name: Build and run navigation routing regression
         run: |
           c++ -std=c++20 -O2 -Wall -Wextra -Werror -ISource Tests/NavigationSmoke.cpp -o biosphere-navigation-tests
