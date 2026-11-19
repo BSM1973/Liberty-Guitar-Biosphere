@@ -6,6 +6,7 @@
 #include <memory>
 #include "EngineNavigation.h"
 #include "BiosphereTheme.h"
+#include "Localization.h"
 
 namespace biosphere::ui
 {
@@ -16,6 +17,7 @@ public:
     std::function<void(int)> onEngineSelected;
 
     void setSelectedEngine(int index);
+    void setLanguage(bool english) { english_ = english; repaint(); }
     int getSelectedEngine() const noexcept { return selected_; }
 
     void paint(juce::Graphics&) override;
@@ -33,6 +35,7 @@ private:
 
     juce::Point<float> getNodeCentre(int index) const;
     juce::Rectangle<float> getNodeHitBox(int index) const;
+    bool english_ = false;
     int selected_ = EngineNavigationState::defaultPage;
     std::array<std::unique_ptr<Hotspot>, EngineNavigationState::pageCount> hotspots_ {};
 };
@@ -40,6 +43,17 @@ private:
 class AnalysisPanel final : public juce::Component
 {
 public:
+    struct Metrics
+    {
+        float envelope = 0.0f, attacks = 0.0f, rhythm = 0.0f;
+        float memory = 0.0f, tonal = 0.0f, rootHz = 0.0f;
+    };
+    void setValues(Metrics metrics) { metrics_ = metrics; repaint(); }
+    void setLanguage(bool english) { english_ = english; repaint(); }
     void paint(juce::Graphics&) override;
+
+private:
+    Metrics metrics_;
+    bool english_ = false;
 };
 } // namespace biosphere::ui
