@@ -232,7 +232,7 @@ public:
             // ignore implausible/unstable periods and fall back to the fixed root.
             if (++zeroCrossCounter_ > static_cast<int>(sampleRate_ / 55.0))
                 trackedRoot_ = 0.0f;
-            if (lastInput_ <= 0.0f && dry[0] > 0.0f && level > 0.015f)
+            if (lastInput_ <= 0.0f && dry[0] > 0.0f && envelope_ > 0.015f)
             {
                 const int period = zeroCrossCounter_;
                 if (period > static_cast<int>(sampleRate_ / 520.0)
