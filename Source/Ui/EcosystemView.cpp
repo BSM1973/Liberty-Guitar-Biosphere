@@ -77,7 +77,7 @@ juce::Rectangle<float> EcosystemView::getNodeHitBox(int index) const
 void EcosystemView::paint(juce::Graphics& g)
 {
     roundedPanel(g, getLocalBounds().toFloat().reduced(1.0f));
-    heading(g, tr(juce::String::fromUTF8("ÉCOSYSTÈME"), english_), { 20, 13, 220, 25 }, 13.0f, white);
+    heading(g, tr(juce::String::fromUTF8("ÉCOSYSTÈME"), english_), { 20, 13, 220, 21 }, 13.0f, white);
     g.setColour(muted);
     g.setFont(juce::Font(juce::FontOptions(11.0f)));
     g.drawFittedText(tr("Choisissez un moteur", english_), 20, 36, 150, 17, juce::Justification::left, 1);
