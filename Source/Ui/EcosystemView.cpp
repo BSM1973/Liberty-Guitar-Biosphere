@@ -79,10 +79,10 @@ juce::Rectangle<float> EcosystemView::getNodeHitBox(int index) const
 void EcosystemView::paint(juce::Graphics& g)
 {
     roundedPanel(g, getLocalBounds().toFloat().reduced(1.0f));
-    heading(g, juce::String::fromUTF8("ÉCOSYSTÈME"), { 20, 13, 220, 25 }, 13.0f, white);
+    heading(g, tr(juce::String::fromUTF8("ÉCOSYSTÈME"), english_), { 20, 13, 220, 25 }, 13.0f, white);
     g.setColour(muted);
     g.setFont(juce::Font(juce::FontOptions(11.0f)));
-    g.drawText("Choisissez un moteur", 20, 36, 175, 17, juce::Justification::left);
+    g.drawText(tr("Choisissez un moteur", english_), 20, 36, 175, 17, juce::Justification::left);
 
     const float w = static_cast<float>(getWidth());
     const float h = static_cast<float>(getHeight());
@@ -101,7 +101,7 @@ void EcosystemView::paint(juce::Graphics& g)
     g.setColour(gold.withAlpha(0.80f));
     g.drawRoundedRectangle(juce::Rectangle<float>(27.0f, h * 0.46f, 86.0f, 29.0f), 5.0f, 1.0f);
     g.setFont(juce::Font(juce::FontOptions(10.0f, juce::Font::bold)));
-    g.drawText(juce::String::fromUTF8("• ENTRÉE"), 30, static_cast<int>(h * 0.46f),
+    g.drawText(tr(juce::String::fromUTF8("• ENTRÉE"), english_), 30, static_cast<int>(h * 0.46f),
                81, 29, juce::Justification::centred);
 
     g.setColour(blue.withAlpha(0.40f));
@@ -116,12 +116,12 @@ void EcosystemView::paint(juce::Graphics& g)
     g.drawEllipse(centre.x - 29.0f, centre.y - 29.0f, 58.0f, 58.0f, 1.0f);
     g.setColour(muted);
     g.setFont(juce::Font(juce::FontOptions(9.0f, juce::Font::bold)));
-    g.drawText(juce::String::fromUTF8("ÉTAT VIVANT"),
+    g.drawText(tr(juce::String::fromUTF8("ÉTAT VIVANT"), english_),
                static_cast<int>(centre.x - 34), static_cast<int>(centre.y - 19), 68, 16,
                juce::Justification::centred);
     g.setColour(white);
     g.setFont(juce::Font(juce::FontOptions(13.5f, juce::Font::bold)));
-    g.drawText("CALME", static_cast<int>(centre.x - 31), static_cast<int>(centre.y - 2),
+    g.drawText(tr("CALME", english_), static_cast<int>(centre.x - 31), static_cast<int>(centre.y - 2),
                62, 24, juce::Justification::centred);
     g.setColour(gold);
     g.drawLine(centre.x - 17.0f, centre.y + 21.0f,
@@ -197,41 +197,60 @@ void EcosystemView::paint(juce::Graphics& g)
     }
     g.setColour(muted.withAlpha(0.75f));
     g.setFont(juce::Font(juce::FontOptions(10.0f)));
-    g.drawText("8 routes à connecter", 20, getHeight() - 24, 170, 17, juce::Justification::left);
+    g.drawText(tr("8 routes à connecter", english_), 20, getHeight() - 24, 170, 17, juce::Justification::left);
 }
 
 void AnalysisPanel::paint(juce::Graphics& g)
 {
     roundedPanel(g, getLocalBounds().toFloat().reduced(1.0f));
-    heading(g, juce::String::fromUTF8("ANALYSE PARTAGÉE"), { 18, 12, getWidth() - 36, 24 }, 12.0f);
-    constexpr std::array<const char*, 4> labels {
-        "Enveloppe", "Attaques", "Activité rythmique", "Activité mémoire"
+    heading(g, tr(juce::String::fromUTF8("ANALYSE PARTAGÉE"), english_),
+            { 18, 12, getWidth() - 36, 24 }, 12.0f);
+
+    const std::array<juce::String, 4> labels {
+        tr("Enveloppe", english_), tr("Attaques", english_),
+        tr(juce::String::fromUTF8("Activité rythmique"), english_),
+        tr(juce::String::fromUTF8("Activité mémoire"), english_)
+    };
+    const std::array<float, 4> levels {
+        metrics_.envelope, metrics_.attacks, metrics_.rhythm, metrics_.memory
     };
     for (int i = 0; i < 4; ++i)
     {
         const int y = 43 + i * 24;
-        g.setColour(white.withAlpha(0.82f));
+        g.setColour(white.withAlpha(0.86f));
         g.setFont(juce::Font(juce::FontOptions(10.5f)));
-        g.drawText(juce::String::fromUTF8(labels[static_cast<std::size_t>(i)]),
-                   17, y, 143, 18, juce::Justification::left);
-        g.setColour(border.withAlpha(0.55f));
-        g.fillRoundedRectangle(juce::Rectangle<float>(165.0f, static_cast<float>(y + 7),
-                               static_cast<float>(juce::jmax(10, getWidth() - 182)), 4.0f), 2.0f);
+        g.drawFittedText(labels[static_cast<std::size_t>(i)],
+                         17, y, 143, 18, juce::Justification::centredLeft, 1);
+
+        const float x = 165.0f, width = static_cast<float>(juce::jmax(10, getWidth() - 182));
+        g.setColour(border.withAlpha(0.58f));
+        g.fillRoundedRectangle(x, static_cast<float>(y + 7), width, 5.0f, 2.0f);
+        g.setColour((i == 1 || i == 3 ? gold : blue).withAlpha(0.94f));
+        g.fillRoundedRectangle(x, static_cast<float>(y + 7),
+                               width * juce::jlimit(0.0f, 1.0f, levels[static_cast<std::size_t>(i)]),
+                               5.0f, 2.0f);
     }
     g.setColour(muted);
     g.setFont(juce::Font(juce::FontOptions(10.0f, juce::Font::bold)));
-    g.drawText(juce::String::fromUTF8("ÉNERGIE TONALE"), 17, 149, 180, 17,
-               juce::Justification::left);
-    g.setColour(border.withAlpha(0.55f));
+    g.drawText(tr(juce::String::fromUTF8("ÉNERGIE TONALE"), english_),
+               17, 149, 180, 17, juce::Justification::left);
+    g.setColour(border.withAlpha(0.58f));
     g.fillRoundedRectangle(17.0f, 170.0f, static_cast<float>(getWidth() - 34), 5.0f, 2.0f);
+    g.setColour(gold);
+    g.fillRoundedRectangle(17.0f, 170.0f,
+                           static_cast<float>(getWidth() - 34)
+                               * juce::jlimit(0.0f, 1.0f, metrics_.tonal), 5.0f, 2.0f);
     g.setColour(white);
     g.setFont(juce::Font(juce::FontOptions(10.5f)));
-    g.drawText("Racine harmonique", 17, 186, 165, 16, juce::Justification::left);
+    g.drawText(tr("Racine harmonique", english_), 17, 185, 165, 16,
+               juce::Justification::left);
     g.setColour(gold);
-    g.drawText("—", getWidth() - 70, 184, 53, 20, juce::Justification::centredRight);
+    const auto root = metrics_.rootHz > 0.0f
+        ? juce::String(metrics_.rootHz, 1) + " Hz" : juce::String::fromUTF8("—");
+    g.drawText(root, getWidth() - 112, 184, 95, 20, juce::Justification::centredRight);
     g.setColour(muted);
     g.setFont(juce::Font(juce::FontOptions(8.5f)));
-    g.drawText(juce::String::fromUTF8("Mesures à raccorder au DSP"),
+    g.drawText(english_ ? "Live DSP measurements" : "Mesures DSP en direct",
                17, getHeight() - 20, getWidth() - 34, 15, juce::Justification::left);
 }
 } // namespace biosphere::ui
