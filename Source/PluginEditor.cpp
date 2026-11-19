@@ -26,7 +26,7 @@ GuitarBiosphereAudioProcessorEditor::GuitarBiosphereAudioProcessorEditor(
     addAndMakeVisible(analysis_);
 
     addAndMakeVisible(preset_);
-    preset_.setTooltip("Choisir un préréglage d'usine ou personnel.");
+    preset_.setTooltip(juce::String::fromUTF8("Choisir un préréglage d'usine ou personnel."));
     preset_.onChange = [this]
     {
         if (preset_.getSelectedId() > 1)
@@ -42,9 +42,9 @@ GuitarBiosphereAudioProcessorEditor::GuitarBiosphereAudioProcessorEditor(
     }
     french_.setColour(juce::TextButton::buttonColourId, gold.darker(0.63f));
     french_.setColour(juce::TextButton::textColourOffId, gold);
-    previous_.setTooltip("Préréglage précédent");
-    next_.setTooltip("Préréglage suivant");
-    library_.setTooltip("Ouvrir la bibliothèque, chercher et enregistrer des préréglages.");
+    previous_.setTooltip(juce::String::fromUTF8("Préréglage précédent"));
+    next_.setTooltip(juce::String::fromUTF8("Préréglage suivant"));
+    library_.setTooltip(juce::String::fromUTF8("Ouvrir la bibliothèque, chercher et enregistrer des préréglages."));
     previous_.onClick = [this] { chooseRelativePreset(-1); };
     next_.onClick = [this] { chooseRelativePreset(1); };
     library_.onClick = [this] { openBrowser(); };
@@ -57,10 +57,10 @@ GuitarBiosphereAudioProcessorEditor::GuitarBiosphereAudioProcessorEditor(
     initialiseGlobalControl(3, juce::String::fromUTF8("Énergie"), "macro.energy", 0, 1, 0.35f, " %");
     initialiseGlobalControl(4, juce::String::fromUTF8("Entrée"), "input", -24, 18, 0, " dB");
     initialiseGlobalControl(5, "Sortie", "output", -24, 12, 0, " dB");
-    initialiseGlobalControl(6, "Mix maître", "mix", 0, 1, 0.65f, " %");
+    initialiseGlobalControl(6, juce::String::fromUTF8("Mix maître"), "mix", 0, 1, 0.65f, " %");
     initialiseGlobalControl(7, juce::String::fromUTF8("Intensité globale"), "global.intensity", 0, 1, 0.50f, " %");
     initialiseGlobalControl(8, "Vitesse globale", "global.speed", 0.25f, 4.0f, 1.0f, " x");
-    initialiseGlobalControl(9, "Largeur stéréo", "global.width", 0, 1, 0.80f, " %");
+    initialiseGlobalControl(9, juce::String::fromUTF8("Largeur stéréo"), "global.width", 0, 1, 0.80f, " %");
 
     for (auto* button : { &sync_, &freeze_, &bypass_ })
     {
@@ -74,8 +74,8 @@ GuitarBiosphereAudioProcessorEditor::GuitarBiosphereAudioProcessorEditor(
     freeze_.setToggleState(false, juce::dontSendNotification);
     bypass_.setToggleState(false, juce::dontSendNotification);
 
-    sync_.setTooltip("Synchronisation PULSE au tempo du DAW, lorsque le tempo hôte est disponible.");
-    freeze_.setTooltip("Fige le tampon MEMORY et conserve les fragments capturés.");
+    sync_.setTooltip(juce::String::fromUTF8("Synchronisation PULSE au tempo du DAW, lorsque le tempo hôte est disponible."));
+    freeze_.setTooltip(juce::String::fromUTF8("Fige le tampon MEMORY et conserve les fragments capturés."));
     bypass_.setTooltip("Contourne le traitement avec un fondu court vers la guitare brute.");
     syncAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
         processor_.parameters, "global.sync", sync_);
@@ -128,7 +128,7 @@ void GuitarBiosphereAudioProcessorEditor::setLanguage(bool english)
         panel->setLanguage(english);
     const std::array<juce::String, 10> names {
         "Croissance", "Mouvement", "Espace", juce::String::fromUTF8("Énergie"),
-        juce::String::fromUTF8("Entrée"), "Sortie", "Mix maître",
+        juce::String::fromUTF8("Entrée"), "Sortie", juce::String::fromUTF8("Mix maître"),
         juce::String::fromUTF8("Intensité globale"), "Vitesse globale",
         juce::String::fromUTF8("Largeur stéréo")
     };
@@ -138,11 +138,11 @@ void GuitarBiosphereAudioProcessorEditor::setLanguage(bool english)
     freeze_.setButtonText(tr("Gel global", english));
     bypass_.setButtonText(tr("Bypass global", english));
     preset_.setTooltip(english ? "Choose a factory or user preset."
-                               : "Choisir un préréglage d'usine ou personnel.");
-    previous_.setTooltip(english ? "Previous preset" : "Préréglage précédent");
-    next_.setTooltip(english ? "Next preset" : "Préréglage suivant");
+                               : juce::String::fromUTF8("Choisir un préréglage d'usine ou personnel."));
+    previous_.setTooltip(english ? "Previous preset" : juce::String::fromUTF8("Préréglage précédent"));
+    next_.setTooltip(english ? "Next preset" : juce::String::fromUTF8("Préréglage suivant"));
     library_.setTooltip(english ? "Open, search and save presets."
-                                : "Ouvrir, rechercher et enregistrer des préréglages.");
+                                : juce::String::fromUTF8("Ouvrir, rechercher et enregistrer des préréglages."));
     french_.setColour(juce::TextButton::buttonColourId,
                       english ? raised : gold.darker(0.60f));
     english_.setColour(juce::TextButton::buttonColourId,
@@ -220,7 +220,7 @@ void GuitarBiosphereAudioProcessorEditor::initialiseGlobalControl(
     jassert(processor_.parameters.getParameter(parameterId) != nullptr);
     control.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processor_.parameters, parameterId, control.slider);
-    control.slider.setTooltip("Automatisation et mémorisation APVTS : " + parameterId);
+    control.slider.setTooltip(juce::String::fromUTF8("Automatisation et mémorisation APVTS : ") + parameterId);
 }
 
 void GuitarBiosphereAudioProcessorEditor::selectEngine(int index)
@@ -277,7 +277,7 @@ void GuitarBiosphereAudioProcessorEditor::paint(juce::Graphics& g)
     g.setFont(juce::Font(juce::FontOptions(11.0f)));
     g.drawText(processor_.analysis.hostBpm.load(std::memory_order_relaxed) > 0.0f
                    ? juce::String(processor_.analysis.hostBpm.load(std::memory_order_relaxed), 0) + " BPM"
-                   : "— BPM", 962, 21, 90, 20, juce::Justification::left);
+                   : "- BPM", 962, 21, 90, 20, juce::Justification::left);
 
     heading(g, tr(juce::String::fromUTF8("ENTRÉE"), processor_.isEnglish()), { 963, 52, 85, 14 }, 10.0f, muted);
     heading(g, tr("SORTIE", processor_.isEnglish()), { 1080, 52, 80, 14 }, 10.0f, muted);

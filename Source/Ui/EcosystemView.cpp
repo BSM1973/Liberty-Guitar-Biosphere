@@ -101,7 +101,7 @@ void EcosystemView::paint(juce::Graphics& g)
     g.setColour(gold.withAlpha(0.80f));
     g.drawRoundedRectangle(juce::Rectangle<float>(27.0f, h * 0.46f, 86.0f, 29.0f), 5.0f, 1.0f);
     g.setFont(juce::Font(juce::FontOptions(10.0f, juce::Font::bold)));
-    g.drawText(tr(juce::String::fromUTF8("• ENTRÉE"), english_), 30, static_cast<int>(h * 0.46f),
+    g.drawText(tr(juce::String::fromUTF8("ENTRÉE"), english_), 30, static_cast<int>(h * 0.46f),
                81, 29, juce::Justification::centred);
 
     g.setColour(blue.withAlpha(0.40f));
@@ -246,7 +246,7 @@ void AnalysisPanel::paint(juce::Graphics& g)
                juce::Justification::left);
     g.setColour(gold);
     const auto root = metrics_.rootHz > 0.0f
-        ? juce::String(metrics_.rootHz, 1) + " Hz" : juce::String::fromUTF8("—");
+        ? juce::String(metrics_.rootHz, 1) + " Hz" : juce::String("-");
     g.drawText(root, getWidth() - 112, 184, 95, 20, juce::Justification::centredRight);
     g.setColour(muted);
     g.setFont(juce::Font(juce::FontOptions(8.5f)));

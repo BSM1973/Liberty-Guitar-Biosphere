@@ -5,9 +5,9 @@
 namespace biosphere::ui
 {
 EnginePanel::EnginePanel(juce::AudioProcessorValueTreeState& state, juce::String number,
-                         juce::String title, juce::String summary, juce::Colour accent,
+                         juce::String title, const char* summaryUtf8, juce::Colour accent,
                          std::vector<ControlSpec> specification, bool dspAvailable)
-    : number_(std::move(number)), title_(std::move(title)), summary_(std::move(summary)),
+    : number_(std::move(number)), title_(std::move(title)), summary_(juce::String::fromUTF8(summaryUtf8)),
       accent_(accent), dspAvailable_(dspAvailable)
 {
     for (const auto& spec : specification)
@@ -43,9 +43,9 @@ EnginePanel::EnginePanel(juce::AudioProcessorValueTreeState& state, juce::String
             jassert(state.getParameter(spec.parameterId) != nullptr);
             slot->attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
                 state, spec.parameterId, slot->dial);
-            slot->dial.setTooltip("Paramètre : " + spec.parameterId
-                + (dspAvailable_ ? ". Contrôle le moteur DSP natif."
-                                 : ". Moteur de modulation à développer."));
+            slot->dial.setTooltip(juce::String::fromUTF8("Paramètre : ") + spec.parameterId
+                + (dspAvailable_ ? juce::String::fromUTF8(". Contrôle le moteur DSP natif.")
+                                 : juce::String::fromUTF8(". Moteur de modulation à développer.")));
         }
         else if (spec.kind == ControlKind::choice)
         {
@@ -84,8 +84,8 @@ EnginePanel::EnginePanel(juce::AudioProcessorValueTreeState& state, juce::String
     active_.setColour(juce::TextButton::textColourOnId, white);
     active_.setColour(juce::TextButton::buttonColourId, raised);
     active_.setTooltip(dspAvailable_
-        ? "Active ou coupe ce moteur DSP (paramètre mémorisé et automatisable)."
-        : "Activé dans les réglages, moteur audio à développer.");
+        ? juce::String::fromUTF8("Active ou coupe ce moteur DSP (paramètre mémorisé et automatisable).")
+        : juce::String::fromUTF8("Activé dans les réglages, moteur audio à développer."));
     addAndMakeVisible(active_);
     jassert(state.getParameter(activeId) != nullptr);
     activeAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
@@ -95,18 +95,18 @@ EnginePanel::EnginePanel(juce::AudioProcessorValueTreeState& state, juce::String
     {
         const juce::StringArray sourceNames {
             "Attaque", "Enveloppe", "Pulse", "Harmonique",
-            "Mutation", "Mémoire", "Évolution", "Silence"
+            "Mutation", juce::String::fromUTF8("Mémoire"), juce::String::fromUTF8("Évolution"), "Silence"
         };
         const juce::StringArray destinationNames {
-            "G·Densité", "P·Profondeur", "H·Mouvement", "M·Rappel",
-            "H·Résonance", "G·Mouvement", "M·Réinjection", "P·Cadence"
+            juce::String::fromUTF8("G: Densité"), juce::String::fromUTF8("P: Profondeur"), juce::String::fromUTF8("H: Mouvement"), juce::String::fromUTF8("M: Rappel"),
+            juce::String::fromUTF8("H: Résonance"), juce::String::fromUTF8("G: Mouvement"), juce::String::fromUTF8("M: Réinjection"), juce::String::fromUTF8("P: Cadence")
         };
         constexpr float amounts[] { .45f, .30f, .32f, .28f, .18f, .22f, .24f, -.25f };
         for (int i = 0; i < 8; ++i)
         {
             auto route = std::make_unique<RouteControls>();
             const auto prefix = "react.route" + juce::String(i + 1);
-            route->enabled.setButtonText("●");
+            route->enabled.setButtonText("R");
             route->enabled.setClickingTogglesState(true);
             route->enabled.setToggleState(true, juce::dontSendNotification);
             route->enabled.setColour(juce::TextButton::buttonColourId, raised);
@@ -159,11 +159,11 @@ void EnginePanel::setLanguage(bool english)
     {
         const juce::StringArray sources {
             "Attaque", "Enveloppe", "Pulse", "Harmonique",
-            "Mutation", "Mémoire", "Évolution", "Silence"
+            "Mutation", juce::String::fromUTF8("Mémoire"), juce::String::fromUTF8("Évolution"), "Silence"
         };
         const juce::StringArray destinations {
-            "G·Densité", "P·Profondeur", "H·Mouvement", "M·Rappel",
-            "H·Résonance", "G·Mouvement", "M·Réinjection", "P·Cadence"
+            juce::String::fromUTF8("G: Densité"), juce::String::fromUTF8("P: Profondeur"), juce::String::fromUTF8("H: Mouvement"), juce::String::fromUTF8("M: Rappel"),
+            juce::String::fromUTF8("H: Résonance"), juce::String::fromUTF8("G: Mouvement"), juce::String::fromUTF8("M: Réinjection"), juce::String::fromUTF8("P: Cadence")
         };
         for (auto& route : routes_)
         {
