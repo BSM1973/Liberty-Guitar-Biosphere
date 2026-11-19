@@ -15,7 +15,7 @@ inline juce::String tr(const juce::String& french, bool english)
         {"ÉTAT VIVANT", "LIVING STATE"},
         {"CALME", "CALM"},
         {"8 routes à connecter", "8 routes to connect"},
-        {"• ENTRÉE", "• INPUT"},
+        {"ENTRÉE", "INPUT"},
         {"ANALYSE PARTAGÉE", "SHARED ANALYSIS"},
         {"Enveloppe", "Envelope"},
         {"Attaques", "Onsets"},
@@ -98,14 +98,14 @@ inline juce::String tr(const juce::String& french, bool english)
         {"Mémoire", "Memory"},
         {"Évolution", "Evolution"},
         {"Silence", "Silence"},
-        {"G·Densité", "G·Density"},
-        {"P·Profondeur", "P·Depth"},
-        {"H·Mouvement", "H·Motion"},
-        {"M·Rappel", "M·Recall"},
-        {"H·Résonance", "H·Resonance"},
-        {"G·Mouvement", "G·Motion"},
-        {"M·Réinjection", "M·Feedback"},
-        {"P·Cadence", "P·Rate"},
+        {"G: Densité", "G: Density"},
+        {"P: Profondeur", "P: Depth"},
+        {"H: Mouvement", "H: Motion"},
+        {"M: Rappel", "M: Recall"},
+        {"H: Résonance", "H: Resonance"},
+        {"G: Mouvement", "G: Motion"},
+        {"M: Réinjection", "M: Feedback"},
+        {"P: Cadence", "P: Rate"},
         {"ROUTES D'INTERACTION", "INTERACTION ROUTES"},
         {"Le geste devient rythme : attaques, pulsations et échos vivants.",
          "Your performance becomes rhythm: onsets, pulses and living echoes."},
@@ -145,5 +145,11 @@ inline juce::String tr(const juce::String& french, bool english)
         if (french == juce::String::fromUTF8(entry.fr))
             return juce::String::fromUTF8(entry.en);
     return french;
+}
+
+// Decode UTF-8 bytes from literal labels before JUCE String construction.
+inline juce::String tr(const char* frenchUtf8, bool english)
+{
+    return tr(juce::String::fromUTF8(frenchUtf8), english);
 }
 } // namespace biosphere::ui

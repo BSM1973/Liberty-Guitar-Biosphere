@@ -169,3 +169,14 @@ Source: `Source/Dsp/BiosphereDSP.h` is independent of JUCE, enabling determinist
 5. Apple Developer ID signing, notarization and Windows release preparation.
 
 © Liberty Music Software. All rights reserved. No redistribution license is granted by this repository.
+
+
+## Texte français/anglais — correction UTF-8
+
+Les textes accentués sont décodés explicitement avec
+`juce::String::fromUTF8` aux frontières entre littéraux C++ et JUCE :
+traductions, descriptions des moteurs, menus, messages d'aide
+et noms de presets. Les accents sont conservés. Les symboles
+décoratifs superflus sont remplacés par des libellés simples et lisibles.
+Le test `Tests/verify_utf8.py` bloque les régressions d'encodage
+les plus courantes. Aucun identifiant APVTS ni paramètre DSP n'a changé.

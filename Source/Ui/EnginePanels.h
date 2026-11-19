@@ -51,7 +51,7 @@ class EnginePanel : public juce::Component
 {
 public:
     EnginePanel(juce::AudioProcessorValueTreeState& state, juce::String number,
-                juce::String title, juce::String summary, juce::Colour accent,
+                juce::String title, const char* summaryUtf8, juce::Colour accent,
                 std::vector<ControlSpec> specification, bool dspAvailable);
     ~EnginePanel() override = default;
 
@@ -75,7 +75,7 @@ private:
 
     struct RouteControls
     {
-        juce::TextButton enabled { "●" };
+        juce::TextButton enabled { "R" };
         juce::ComboBox source, destination;
         juce::Slider amount;
         std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> enabledAttachment;

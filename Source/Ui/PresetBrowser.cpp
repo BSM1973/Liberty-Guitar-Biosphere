@@ -153,8 +153,8 @@ void PresetBrowser::paintListBoxItem(int row, juce::Graphics& g, int width, int 
     }
     g.setColour(library_.isFavorite(index) ? gold : muted);
     g.setFont(juce::Font(juce::FontOptions(14.0f)));
-    g.drawText(library_.isFavorite(index) ? juce::String::fromUTF8("★")
-                                        : juce::String::fromUTF8("☆"),
+    g.drawText(library_.isFavorite(index) ? juce::String("F")
+                                        : juce::String("-"),
                13, 0, 28, height, juce::Justification::centred);
     g.setColour(selected ? gold : white);
     g.setFont(juce::Font(juce::FontOptions(12.3f)));
@@ -179,11 +179,11 @@ void PresetBrowser::selectedRowsChanged(int)
     favorite_.setEnabled(hasSelection);
     remove_.setEnabled(hasSelection && library_.all()[static_cast<std::size_t>(index)].user);
     favorite_.setButtonText(hasSelection && library_.isFavorite(index)
-                                ? juce::String::fromUTF8("★")
-                                : juce::String::fromUTF8("☆"));
+                                ? juce::String("F")
+                                : juce::String("-"));
     confirmDelete_ = false;
     remove_.setButtonText(tr("Supprimer", english_));
-    status_.setText(juce::String(visible_.size()) + (english_ ? " results" : " résultats"),
+    status_.setText(juce::String(visible_.size()) + (english_ ? juce::String(" results") : juce::String::fromUTF8(" résultats")),
                     juce::dontSendNotification);
 }
 

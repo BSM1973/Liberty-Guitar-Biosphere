@@ -60,7 +60,7 @@ private:
     juce::ComboBox preset_;
     juce::TextButton previous_ { "<" }, next_ { ">" }, library_ { "..." };
     juce::TextButton french_ { "FR" }, english_ { "EN" };
-    juce::TextButton sync_ { "Synchro hôte" }, freeze_ { "Gel global" },
+    juce::TextButton sync_ { "Synchro hote" }, freeze_ { "Gel global" },
                      bypass_ { "Bypass global" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> syncAttachment_;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> freezeAttachment_;

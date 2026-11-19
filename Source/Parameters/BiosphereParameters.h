@@ -86,7 +86,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
     toggle("mut.active",        "Mutation actif", true);
     number("mut.density",       "Densité", 1, 40, 12, 0.1f);
     menu("mut.character",       "Caractère",
-         { "Organique", "Cristal", "Métallique", "Nuage" }, 0);
+         { "Organique", "Cristal", juce::String::fromUTF8("Métallique"), "Nuage" }, 0);
     number("mut.motion",        "Mouvement granulaire", 0, 1, 0.25f);
     number("mut.pitch",         "Hauteur", -12, 12, 0, 0.1f);
     number("mut.random",        "Aléatoire", 0, 1, 0.20f);
@@ -102,11 +102,11 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
 
     const juce::StringArray sources {
         "Attaque", "Enveloppe", "Pulse", "Harmonique",
-        "Mutation", "Mémoire", "Évolution", "Silence"
+        "Mutation", juce::String::fromUTF8("Mémoire"), juce::String::fromUTF8("Évolution"), "Silence"
     };
     const juce::StringArray destinations {
-        "G·Densité", "P·Profondeur", "H·Mouvement", "M·Rappel",
-        "H·Résonance", "G·Mouvement", "M·Réinjection", "P·Cadence"
+        juce::String::fromUTF8("G: Densité"), juce::String::fromUTF8("P: Profondeur"), juce::String::fromUTF8("H: Mouvement"), juce::String::fromUTF8("M: Rappel"),
+        juce::String::fromUTF8("H: Résonance"), juce::String::fromUTF8("G: Mouvement"), juce::String::fromUTF8("M: Réinjection"), juce::String::fromUTF8("P: Cadence")
     };
     constexpr float amounts[] { .45f, .30f, .32f, .28f, .18f, .22f, .24f, -.25f };
     for (int i = 0; i < 8; ++i)
