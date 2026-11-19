@@ -70,7 +70,7 @@ inline Rect hotspot(int index, float width, float height) noexcept
         return {p.x - 82.0f, p.y - 45.0f, 164.0f, 65.0f};
     return {p.x - 82.0f, p.y - 19.0f, 164.0f, 63.0f};
 }
-inline Rect title() noexcept { return {20.0f, 13.0f, 220.0f, 25.0f}; }
+inline Rect title() noexcept { return {20.0f, 13.0f, 220.0f, 21.0f}; }
 inline Rect subtitle() noexcept { return {20.0f, 36.0f, 150.0f, 17.0f}; }
 inline Rect footer(float height) noexcept
 {
