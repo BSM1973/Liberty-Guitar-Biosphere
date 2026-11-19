@@ -130,7 +130,7 @@ void GuitarBiosphereAudioProcessorEditor::setLanguage(bool english)
         "Croissance", "Mouvement", "Espace", juce::String::fromUTF8("Énergie"),
         juce::String::fromUTF8("Entrée"), "Sortie", juce::String::fromUTF8("Mix maître"),
         juce::String::fromUTF8("Intensité globale"), "Vitesse globale",
-        juce::String::fromUTF8(juce::String::fromUTF8("Largeur stéréo"))
+        juce::String::fromUTF8("Largeur stéréo")
     };
     for (std::size_t i = 0; i < names.size(); ++i)
         globals_[i].label.setText(tr(names[i], english), juce::dontSendNotification);
