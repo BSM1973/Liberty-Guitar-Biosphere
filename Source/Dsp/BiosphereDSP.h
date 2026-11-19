@@ -316,6 +316,7 @@ public:
                 {{ 1.0f, 1.3333333f, 1.5f }} // suspended
             }};
             const auto& intervals = harmonicIntervals[static_cast<std::size_t>(p.harmonicMode)];
+            float tonalInstant = 0.0f;
             for (int channel = 0; channel < channels; ++channel)
             {
                 const auto ch = static_cast<std::size_t>(channel);
@@ -370,6 +371,7 @@ public:
                     harmonicDelta *= p.harmonic * p.harmonicResonance * 0.35f * stereoSpread;
                 else
                     harmonicDelta = 0.0f;
+                tonalInstant += std::abs(harmonicDelta);
 
                 // MUTATION: overlapping tapered grains from live circular audio.
                 float grainWet = 0.0f;
@@ -437,9 +439,8 @@ public:
             // Audio-derived activity indicators: no invented/synthetic meter levels.
             const float memoryTarget = shouldRecall ? 1.0f : 0.0f;
             memoryActivity_ += 0.004f * (memoryTarget - memoryActivity_);
-            const float tonalTarget = p.harmonicActive
-                ? std::clamp(p.harmonic * p.harmonicResonance * envelope_ * 3.5f, 0.0f, 1.0f)
-                : 0.0f;
+            const float tonalTarget = std::clamp(
+                (tonalInstant / static_cast<float>(channels)) * 3.0f, 0.0f, 1.0f);
             tonalEnergy_ += 0.004f * (tonalTarget - tonalEnergy_);
             for (int channel = 0; channel < channels; ++channel)
             {
