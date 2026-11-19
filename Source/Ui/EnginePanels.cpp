@@ -142,6 +142,40 @@ EnginePanel::EnginePanel(juce::AudioProcessorValueTreeState& state, juce::String
     }
 }
 
+void EnginePanel::setLanguage(bool english)
+{
+    english_ = english;
+    active_.setButtonText(tr("ACTIF", english_));
+    for (auto& slot : slots_)
+    {
+        slot->caption.setText(tr(slot->spec.name, english_), juce::dontSendNotification);
+        if (slot->spec.kind == ControlKind::switchButton)
+            slot->toggle.setButtonText(tr("Oui / Non", english_));
+        else if (slot->spec.kind == ControlKind::choice)
+            for (int index = 0; index < slot->spec.choices.size(); ++index)
+                slot->choice.changeItemText(index + 1, tr(slot->spec.choices[index], english_));
+    }
+    if (title_ == "REACTION")
+    {
+        const juce::StringArray sources {
+            "Attaque", "Enveloppe", "Pulse", "Harmonique",
+            "Mutation", "Mémoire", "Évolution", "Silence"
+        };
+        const juce::StringArray destinations {
+            "G·Densité", "P·Profondeur", "H·Mouvement", "M·Rappel",
+            "H·Résonance", "G·Mouvement", "M·Réinjection", "P·Cadence"
+        };
+        for (auto& route : routes_)
+        {
+            for (int i = 0; i < sources.size(); ++i)
+                route->source.changeItemText(i + 1, tr(sources[i], english_));
+            for (int i = 0; i < destinations.size(); ++i)
+                route->destination.changeItemText(i + 1, tr(destinations[i], english_));
+        }
+    }
+    repaint();
+}
+
 void EnginePanel::paint(juce::Graphics& g)
 {
     const auto area = getLocalBounds().toFloat().reduced(1.0f);
@@ -153,7 +187,7 @@ void EnginePanel::paint(juce::Graphics& g)
 
     g.setColour(muted);
     g.setFont(juce::Font(juce::FontOptions(11.5f)));
-    g.drawFittedText(summary_, 260, 12, getWidth() - 417, 28,
+    g.drawFittedText(tr(summary_, english_), 260, 12, getWidth() - 417, 28,
                      juce::Justification::centredLeft, 1);
 
     g.setColour(border.withAlpha(0.60f));
