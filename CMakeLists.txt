@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(LibertyGuitarBiosphere VERSION 0.1.0 LANGUAGES C CXX)
+project(LibertyGuitarBiosphere VERSION 0.5.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -18,6 +18,11 @@ if(BUILD_TESTING)
     target_include_directories(BiosphereDspRoutingTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
     target_compile_features(BiosphereDspRoutingTests PRIVATE cxx_std_20)
     add_test(NAME BiosphereDspRoutingTests COMMAND BiosphereDspRoutingTests)
+
+    add_executable(BiosphereAnalysisTests Tests/AnalysisSmoke.cpp)
+    target_include_directories(BiosphereAnalysisTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
+    target_compile_features(BiosphereAnalysisTests PRIVATE cxx_std_20)
+    add_test(NAME BiosphereAnalysisTests COMMAND BiosphereAnalysisTests)
 
     add_executable(BiosphereNavigationTests Tests/NavigationSmoke.cpp)
     target_include_directories(BiosphereNavigationTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
@@ -41,7 +46,7 @@ else()
 endif()
 
 juce_add_plugin(GuitarBiosphere
-    VERSION 0.1.0
+    VERSION 0.5.0
     COMPANY_NAME "Liberty Music Software"
     BUNDLE_ID "com.libertymusicsoftware.guitarbiosphere"
     PLUGIN_MANUFACTURER_CODE Lbms
@@ -65,6 +70,11 @@ target_sources(GuitarBiosphere PRIVATE
     Source/PluginEditor.cpp
     Source/PluginEditor.h
     Source/Ui/BiosphereTheme.h
+    Source/Ui/Localization.h
+    Source/Ui/PresetLibrary.h
+    Source/Ui/PresetLibrary.cpp
+    Source/Ui/PresetBrowser.h
+    Source/Ui/PresetBrowser.cpp
     Source/Ui/EnginePanels.h
     Source/Ui/EnginePanels.cpp
     Source/Ui/EngineNavigation.h

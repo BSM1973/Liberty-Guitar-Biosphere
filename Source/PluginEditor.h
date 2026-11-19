@@ -8,8 +8,11 @@
 #include "Ui/EcosystemView.h"
 #include "Ui/EnginePanels.h"
 #include "Ui/EngineNavigation.h"
+#include "Ui/PresetLibrary.h"
+#include "Ui/PresetBrowser.h"
+#include "Ui/Localization.h"
 
-class GuitarBiosphereAudioProcessorEditor final : public juce::AudioProcessorEditor
+class GuitarBiosphereAudioProcessorEditor final : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
     explicit GuitarBiosphereAudioProcessorEditor(GuitarBiosphereAudioProcessor&);
@@ -19,6 +22,11 @@ public:
     void resized() override;
 
 private:
+    void timerCallback() override;
+    void setLanguage(bool english);
+    void refreshPresetSelector();
+    void openBrowser();
+    void chooseRelativePreset(int increment);
     struct GlobalControl
     {
         juce::Label label;
@@ -34,6 +42,8 @@ private:
 
     biosphere::ui::LookAndFeel theme_;
     GuitarBiosphereAudioProcessor& processor_;
+    biosphere::ui::PresetLibrary presetLibrary_;
+    biosphere::ui::PresetBrowser browser_;
 
     biosphere::ui::EcosystemView ecosystem_;
     biosphere::ui::AnalysisPanel analysis_;

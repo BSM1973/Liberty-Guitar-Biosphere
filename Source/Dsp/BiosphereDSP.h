@@ -49,6 +49,14 @@ struct Parameters
     int memoryRepeat = 0;
 };
 
+// Published only AFTER processing a block. The processor transfers these
+// values into atomics; the editor must never read the DSP state directly.
+struct AnalysisValues
+{
+    float envelope = 0.0f, attacks = 0.0f, rhythmicActivity = 0.0f;
+    float memoryActivity = 0.0f, tonalEnergy = 0.0f, rootHz = 0.0f;
+};
+
 // The four macros are non-destructive multipliers: raw APVTS values never change.
 // All calculations are bounded and deterministic, with no dynamic allocation.
 inline Parameters mapPerformanceControls(Parameters p) noexcept
@@ -86,6 +94,12 @@ inline Parameters mapPerformanceControls(Parameters p) noexcept
 class BiosphereDSP
 {
 public:
+    AnalysisValues getAnalysisValues() const noexcept
+    {
+        return { envelope_, attackActivity_, rhythmicActivity_,
+                 memoryActivity_, tonalEnergy_, trackedRoot_ };
+    }
+
     void prepare(double sampleRate, int, int channels)
     {
         sampleRate_ = std::max(8000.0, sampleRate);
@@ -107,6 +121,7 @@ public:
     void reset() noexcept
     {
         phase_ = envelope_ = 0.0f;
+        attackActivity_ = rhythmicActivity_ = memoryActivity_ = tonalEnergy_ = 0.0f;
         grainWrite_ = memoryWrite_ = pulseWrite_ = 0;
         processedSamples_ = 0;
         attackCooldown_ = memoryCooldown_ = grainCountdown_ = 0;
@@ -211,12 +226,13 @@ public:
             const float threshold = 0.045f + 0.20f * (1.0f - p.pulseSensitivity);
             const bool onset = attackCooldown_ == 0 && level > threshold && level > prior * 1.65f;
             if (onset) attackCooldown_ = static_cast<int>(sampleRate_ * 0.095);
+            attackActivity_ = onset ? 1.0f : attackActivity_ * 0.998f;
 
             // Conservative zero-crossing estimate for near-monophonic inputs:
             // ignore implausible/unstable periods and fall back to the fixed root.
             if (++zeroCrossCounter_ > static_cast<int>(sampleRate_ / 55.0))
                 trackedRoot_ = 0.0f;
-            if (lastInput_ <= 0.0f && dry[0] > 0.0f && level > 0.015f)
+            if (lastInput_ <= 0.0f && dry[0] > 0.0f && envelope_ > 0.015f)
             {
                 const int period = zeroCrossCounter_;
                 if (period > static_cast<int>(sampleRate_ / 520.0)
@@ -289,6 +305,10 @@ public:
                 : 0.5f + (pulsePosition - swingDivider) / (1.0f - swingDivider) * 0.5f;
 
             const float root = (p.harmonicMono && trackedRoot_ > 0.0f) ? trackedRoot_ : p.rootHz;
+            const float rhythmTarget = p.pulseActive
+                ? envelope_ * (0.5f + 0.5f * std::sin(phase_)) * p.pulse : 0.0f;
+            rhythmicActivity_ += 0.007f * (std::clamp(rhythmTarget * 4.0f, 0.0f, 1.0f)
+                                            - rhythmicActivity_);
             constexpr std::array<std::array<float, 3>, 4> harmonicIntervals {{
                 {{ 1.0f, 1.5f, 2.0f }}, // fifths
                 {{ 1.0f, 2.0f, 4.0f }}, // octaves
@@ -296,6 +316,7 @@ public:
                 {{ 1.0f, 1.3333333f, 1.5f }} // suspended
             }};
             const auto& intervals = harmonicIntervals[static_cast<std::size_t>(p.harmonicMode)];
+            float tonalInstant = 0.0f;
             for (int channel = 0; channel < channels; ++channel)
             {
                 const auto ch = static_cast<std::size_t>(channel);
@@ -350,6 +371,7 @@ public:
                     harmonicDelta *= p.harmonic * p.harmonicResonance * 0.35f * stereoSpread;
                 else
                     harmonicDelta = 0.0f;
+                tonalInstant += std::abs(harmonicDelta);
 
                 // MUTATION: overlapping tapered grains from live circular audio.
                 float grainWet = 0.0f;
@@ -414,6 +436,12 @@ public:
                 delta[0] = mid + side;
                 delta[1] = mid - side;
             }
+            // Audio-derived activity indicators: no invented/synthetic meter levels.
+            const float memoryTarget = shouldRecall ? 1.0f : 0.0f;
+            memoryActivity_ += 0.004f * (memoryTarget - memoryActivity_);
+            const float tonalTarget = std::clamp(
+                (tonalInstant / static_cast<float>(channels)) * 3.0f, 0.0f, 1.0f);
+            tonalEnergy_ += 0.004f * (tonalTarget - tonalEnergy_);
             for (int channel = 0; channel < channels; ++channel)
             {
                 const auto ch = static_cast<std::size_t>(channel);
@@ -520,6 +548,8 @@ private:
     int memoryAge_ = -1, memoryLength_ = 1;
     bool memoryHasCapture_ = false, smoothed_ = false;
     float phase_ = 0.0f, envelope_ = 0.0f;
+    float attackActivity_ = 0.0f, rhythmicActivity_ = 0.0f;
+    float memoryActivity_ = 0.0f, tonalEnergy_ = 0.0f;
     float smoothedInput_ = 1.0f, smoothedOutput_ = 1.0f, smoothedMix_ = 0.65f;
     float smoothedWidth_ = 0.8f, smoothedIntensity_ = 0.5f, wetBypass_ = 1.0f;
     float trackedRoot_ = 0.0f, lastInput_ = 0.0f;

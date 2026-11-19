@@ -45,6 +45,10 @@ void GuitarBiosphereAudioProcessor::processBlock(juce::AudioBuffer<float>& buffe
     if (channels < 1 || samples == 0)
         return;
 
+    float inputPeak = 0.0f;
+    for (int channel = 0; channel < channels; ++channel)
+        inputPeak = std::max(inputPeak, buffer.getMagnitude(channel, 0, samples));
+
     // One atomic APVTS snapshot per host block; no allocations or locks.
     // The legacy 11 parameter IDs must remain unchanged for DAW compatibility.
     auto value = [&](const char* name) noexcept
@@ -126,6 +130,21 @@ void GuitarBiosphereAudioProcessor::processBlock(juce::AudioBuffer<float>& buffe
     // modulation DSP exists yet. Do not pretend they affect audio.
     float* audio[2] = { buffer.getWritePointer(0), channels > 1 ? buffer.getWritePointer(1) : nullptr };
     dsp_.process(audio, channels, samples, p);
+
+    // Single writer (audio thread) to atomic snapshots, consumed by UI at 30 Hz.
+    const auto values = dsp_.getAnalysisValues();
+    analysis.envelope.store(values.envelope, std::memory_order_relaxed);
+    analysis.attacks.store(values.attacks, std::memory_order_relaxed);
+    analysis.rhythmicActivity.store(values.rhythmicActivity, std::memory_order_relaxed);
+    analysis.memoryActivity.store(values.memoryActivity, std::memory_order_relaxed);
+    analysis.tonalEnergy.store(values.tonalEnergy, std::memory_order_relaxed);
+    analysis.rootHz.store(values.rootHz, std::memory_order_relaxed);
+    analysis.hostBpm.store(p.hasHostBpm ? p.hostBpm : 0.0f, std::memory_order_relaxed);
+    analysis.inputPeak.store(inputPeak, std::memory_order_relaxed);
+    float outputPeak = 0.0f;
+    for (int channel = 0; channel < channels; ++channel)
+        outputPeak = std::max(outputPeak, buffer.getMagnitude(channel, 0, samples));
+    analysis.outputPeak.store(outputPeak, std::memory_order_relaxed);
 }
 
 void GuitarBiosphereAudioProcessor::getStateInformation(juce::MemoryBlock& destination)
@@ -133,6 +152,7 @@ void GuitarBiosphereAudioProcessor::getStateInformation(juce::MemoryBlock& desti
     auto state = parameters.copyState();
     // UI-only selection; it must not become a host-automatable audio parameter.
     state.setProperty("editorPage", getSelectedEditorPage(), nullptr);
+    state.setProperty("editorLanguage", isEnglish() ? "en" : "fr", nullptr);
     if (auto xml = state.createXml())
         copyXmlToBinary(*xml, destination);
 }
@@ -151,6 +171,7 @@ void GuitarBiosphereAudioProcessor::setStateInformation(const void* data, int si
                 setSelectedEditorPage(page);
             else
                 setSelectedEditorPage(biosphere::ui::EngineNavigationState::defaultPage);
+            setEnglish(restored.getProperty("editorLanguage", "fr").toString() == "en");
             parameters.replaceState(restored);
         }
     }

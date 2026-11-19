@@ -4,6 +4,17 @@
 #include "Ui/EngineNavigation.h"
 #include "Dsp/BiosphereDSP.h"
 
+// DSP writes audio measurements, UI reads them at a fixed timer rate.
+// All fields are atomic to avoid a JUCE audio/message-thread data race.
+struct SharedAnalysisState
+{
+    std::atomic<float> envelope {0.0f}, attacks {0.0f};
+    std::atomic<float> rhythmicActivity {0.0f}, memoryActivity {0.0f};
+    std::atomic<float> tonalEnergy {0.0f}, rootHz {0.0f};
+    std::atomic<float> inputPeak {0.0f}, outputPeak {0.0f};
+    std::atomic<float> hostBpm {0.0f};
+};
+
 class GuitarBiosphereAudioProcessor final : public juce::AudioProcessor
 {
 public:
@@ -35,6 +46,7 @@ public:
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
 
     juce::AudioProcessorValueTreeState parameters;
+    SharedAnalysisState analysis;
 
     int getSelectedEditorPage() const noexcept
     {
@@ -47,10 +59,15 @@ public:
             selectedEditorPage_.store(index, std::memory_order_relaxed);
     }
 
+    // Presentation state only — FR is the default; language is never an audio parameter.
+    bool isEnglish() const noexcept { return english_.load(std::memory_order_relaxed); }
+    void setEnglish(bool english) noexcept { english_.store(english, std::memory_order_relaxed); }
+
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout makeParameterLayout();
     biosphere::BiosphereDSP dsp_;
     std::atomic<int> selectedEditorPage_ { biosphere::ui::EngineNavigationState::defaultPage };
+    std::atomic<bool> english_ { false };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GuitarBiosphereAudioProcessor)
 };

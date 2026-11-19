@@ -5,6 +5,7 @@
 #include <array>
 #include <vector>
 #include "BiosphereTheme.h"
+#include "Localization.h"
 
 namespace biosphere::ui
 {
@@ -56,6 +57,7 @@ public:
 
     void paint(juce::Graphics&) override;
     void resized() override;
+    void setLanguage(bool english);
     const juce::String& getTitle() const noexcept { return title_; }
 
 private:
@@ -84,6 +86,7 @@ private:
     juce::String number_, title_, summary_;
     juce::Colour accent_;
     bool dspAvailable_ = false;
+    bool english_ = false;
     std::vector<std::unique_ptr<Slot>> slots_;
     juce::TextButton active_ { "ACTIF" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> activeAttachment_;
