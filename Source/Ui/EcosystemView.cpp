@@ -12,11 +12,11 @@ void EcosystemView::Hotspot::paintButton(juce::Graphics& g, bool highlighted, bo
     // Preserve the reference UI: hover/focus highlights only the circular icon,
     // never a large rectangle over the ecosystem orbit or its labels.
     const float cx = getWidth() * 0.5f;
-    const float cy = 34.0f;
+    const float cy = engineIndex_ == 1 ? 45.0f : 19.0f;
     g.setColour(gold.withAlpha(down ? 0.30f : 0.10f));
-    g.fillEllipse(cx - 27.0f, cy - 27.0f, 54.0f, 54.0f);
+    g.fillEllipse(cx - 20.0f, cy - 20.0f, 40.0f, 40.0f);
     g.setColour(gold.withAlpha(hasKeyboardFocus(true) ? 0.9f : 0.40f));
-    g.drawEllipse(cx - 27.0f, cy - 27.0f, 54.0f, 54.0f,
+    g.drawEllipse(cx - 20.0f, cy - 20.0f, 40.0f, 40.0f,
                   hasKeyboardFocus(true) ? 1.5f : 1.0f);
 }
 
@@ -25,7 +25,7 @@ EcosystemView::EcosystemView()
     for (int index = 0; index < EngineNavigationState::pageCount; ++index)
     {
         auto button = std::make_unique<Hotspot>(
-            juce::String::fromUTF8(enginePageNames[static_cast<std::size_t>(index)]));
+            juce::String::fromUTF8(enginePageNames[static_cast<std::size_t>(index)]), index);
         button->setComponentID("engine-node-" + juce::String(index));
         button->setTooltip("Afficher le panneau " +
             juce::String::fromUTF8(enginePageNames[static_cast<std::size_t>(index)]));
@@ -62,18 +62,16 @@ void EcosystemView::resized()
 
 juce::Point<float> EcosystemView::getNodeCentre(int index) const
 {
-    const float width = static_cast<float>(getWidth());
-    const float height = static_cast<float>(getHeight());
-    const std::array<float, 6> horizontal { 0.305f, 0.525f, 0.745f,
-                                            0.305f, 0.525f, 0.745f };
-    const float vertical = index < 3 ? 0.26f : 0.76f;
-    return { width * horizontal[static_cast<std::size_t>(index)], height * vertical };
+    const auto point = ecosystem_layout::node(index, static_cast<float>(getWidth()),
+                                              static_cast<float>(getHeight()));
+    return {point.x, point.y};
 }
 
 juce::Rectangle<float> EcosystemView::getNodeHitBox(int index) const
 {
-    const auto centre = getNodeCentre(index);
-    return { centre.x - 82.0f, centre.y - 34.0f, 164.0f, 78.0f };
+    const auto rect = ecosystem_layout::hotspot(index, static_cast<float>(getWidth()),
+                                                static_cast<float>(getHeight()));
+    return {rect.x, rect.y, rect.w, rect.h};
 }
 
 void EcosystemView::paint(juce::Graphics& g)
@@ -82,11 +80,12 @@ void EcosystemView::paint(juce::Graphics& g)
     heading(g, tr(juce::String::fromUTF8("ÉCOSYSTÈME"), english_), { 20, 13, 220, 25 }, 13.0f, white);
     g.setColour(muted);
     g.setFont(juce::Font(juce::FontOptions(11.0f)));
-    g.drawText(tr("Choisissez un moteur", english_), 20, 36, 175, 17, juce::Justification::left);
+    g.drawFittedText(tr("Choisissez un moteur", english_), 20, 36, 150, 17, juce::Justification::left, 1);
 
     const float w = static_cast<float>(getWidth());
     const float h = static_cast<float>(getHeight());
-    const juce::Point<float> centre { w * 0.525f, h * 0.51f };
+    const auto stateHub = ecosystem_layout::hub(w, h);
+    const juce::Point<float> centre { stateHub.x, stateHub.y };
 
     juce::ColourGradient halo(blue.withAlpha(0.21f), centre.x, centre.y,
                               navy.withAlpha(0.0f), centre.x + w * 0.31f, centre.y, true);
@@ -109,20 +108,20 @@ void EcosystemView::paint(juce::Graphics& g)
 
     juce::ColourGradient hub(raised, centre.x, centre.y - 45.0f, navy, centre.x, centre.y + 45.0f, false);
     g.setGradientFill(hub);
-    g.fillEllipse(centre.x - 35.0f, centre.y - 35.0f, 70.0f, 70.0f);
+    g.fillEllipse(centre.x - 31.0f, centre.y - 31.0f, 62.0f, 62.0f);
     g.setColour(gold.withAlpha(0.65f));
-    g.drawEllipse(centre.x - 46.0f, centre.y - 46.0f, 92.0f, 92.0f, 1.3f);
+    g.drawEllipse(centre.x - 32.0f, centre.y - 32.0f, 64.0f, 64.0f, 1.3f);
     g.setColour(blue.withAlpha(0.5f));
-    g.drawEllipse(centre.x - 29.0f, centre.y - 29.0f, 58.0f, 58.0f, 1.0f);
+    g.drawEllipse(centre.x - 26.0f, centre.y - 26.0f, 52.0f, 52.0f, 1.0f);
     g.setColour(muted);
-    g.setFont(juce::Font(juce::FontOptions(9.0f, juce::Font::bold)));
-    g.drawText(tr(juce::String::fromUTF8("ÉTAT VIVANT"), english_),
-               static_cast<int>(centre.x - 34), static_cast<int>(centre.y - 19), 68, 16,
-               juce::Justification::centred);
+    g.setFont(juce::Font(juce::FontOptions(8.2f, juce::Font::bold)));
+    g.drawFittedText(tr(juce::String::fromUTF8("ÉTAT VIVANT"), english_),
+                     static_cast<int>(centre.x - 30), static_cast<int>(centre.y - 19), 60, 16,
+                     juce::Justification::centred, 1);
     g.setColour(white);
     g.setFont(juce::Font(juce::FontOptions(13.5f, juce::Font::bold)));
-    g.drawText(tr("CALME", english_), static_cast<int>(centre.x - 31), static_cast<int>(centre.y - 2),
-               62, 24, juce::Justification::centred);
+    g.drawFittedText(tr("CALME", english_), static_cast<int>(centre.x - 30),
+                     static_cast<int>(centre.y - 2), 60, 24, juce::Justification::centred, 1);
     g.setColour(gold);
     g.drawLine(centre.x - 17.0f, centre.y + 21.0f,
                centre.x + 17.0f, centre.y + 21.0f, 2.0f);
@@ -191,13 +190,16 @@ void EcosystemView::paint(juce::Graphics& g)
         g.strokePath(mark, juce::PathStrokeType(1.7f));
 
         g.setColour(i == selected_ ? gold : white.withAlpha(0.86f));
-        g.setFont(juce::Font(juce::FontOptions(11.0f, juce::Font::bold)));
-        g.drawText(juce::String::fromUTF8(enginePageNames[static_cast<std::size_t>(i)]), static_cast<int>(p.x - 80.0f),
-                   static_cast<int>(p.y + 26.0f), 160, 18, juce::Justification::centred);
+        g.setFont(juce::Font(juce::FontOptions(i == 1 ? 9.0f : 10.5f, juce::Font::bold)));
+        const auto label = ecosystem_layout::label(i, w, h);
+        g.drawFittedText(juce::String::fromUTF8(enginePageNames[static_cast<std::size_t>(i)]),
+                         juce::Rectangle<float>(label.x, label.y, label.w, label.h).toNearestInt(),
+                         juce::Justification::centred, 1);
     }
     g.setColour(muted.withAlpha(0.75f));
     g.setFont(juce::Font(juce::FontOptions(10.0f)));
-    g.drawText(tr("8 routes à connecter", english_), 20, getHeight() - 24, 170, 17, juce::Justification::left);
+    g.drawFittedText(tr("8 routes à connecter", english_), 20, getHeight() - 24, 145, 17,
+                     juce::Justification::centredLeft, 1);
 }
 
 void AnalysisPanel::paint(juce::Graphics& g)
