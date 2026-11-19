@@ -14,6 +14,10 @@ void verify(float width, float height)
     const std::array<const char*, 4> chromeNames { "title", "instruction", "footer", "input" };
     if (!viewport.contains(state))
         throw std::runtime_error("Central state out of bounds");
+    for (std::size_t a = 0; a < chrome.size(); ++a)
+        for (std::size_t b = a + 1; b < chrome.size(); ++b)
+            if (chrome[a].overlaps(chrome[b]))
+                throw std::runtime_error("Header/footer/input texts overlap");
 
     for (int i = 0; i < count; ++i)
     {
