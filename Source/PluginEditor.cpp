@@ -137,6 +137,12 @@ void GuitarBiosphereAudioProcessorEditor::setLanguage(bool english)
     sync_.setButtonText(tr("Synchro hôte", english));
     freeze_.setButtonText(tr("Gel global", english));
     bypass_.setButtonText(tr("Bypass global", english));
+    preset_.setTooltip(english ? "Choose a factory or user preset."
+                               : "Choisir un préréglage d'usine ou personnel.");
+    previous_.setTooltip(english ? "Previous preset" : "Préréglage précédent");
+    next_.setTooltip(english ? "Next preset" : "Préréglage suivant");
+    library_.setTooltip(english ? "Open, search and save presets."
+                                : "Ouvrir, rechercher et enregistrer des préréglages.");
     french_.setColour(juce::TextButton::buttonColourId,
                       english ? raised : gold.darker(0.60f));
     english_.setColour(juce::TextButton::buttonColourId,
@@ -261,7 +267,8 @@ void GuitarBiosphereAudioProcessorEditor::paint(juce::Graphics& g)
 
     g.setColour(muted);
     g.setFont(juce::Font(juce::FontOptions(10.0f)));
-    g.drawText(juce::String::fromUTF8("LE MOTEUR D'EFFETS GUITARE VIVANT"),
+    g.drawText(tr(juce::String::fromUTF8("LE MOTEUR D'EFFETS GUITARE VIVANT"),
+                  processor_.isEnglish()),
                31, 82, 440, 16, juce::Justification::left);
 
     roundedPanel(g, { 550.0f, 15.0f, 405.0f, 77.0f }, 8.0f);
