@@ -3,7 +3,7 @@
 
 Native C++20 / JUCE 8 guitar audio-effect plugin for macOS (AU / VST3) and Windows (VST3).
 
-## Development status — Phase 4
+## Development status — Phase 5
 
 This is an **early functional DSP foundation**, not a finished commercial product.
 
@@ -32,16 +32,45 @@ Implemented:
 - MEMORY: recall duration, capture sensitivity, repeat rate, reverse blend, feedback, fade, freeze, independent mix and enable.
 - Four live performance macros (GROWTH, MOTION, SPACE, ENERGY) change multiple engine parameters without overwriting stored APVTS values.
 - Master bus: smoothed input/output gain, dry/wet, intensity, speed, processed stereo width, host BPM sync, global memory freeze and smooth raw bypass.
-- REACTION route controls are now fully editable and saved as parameters, although the modulation engine is pending. Shared analysis is still a UI placeholder.
+- REACTION route controls are editable and saved as parameters; its modulation DSP remains pending.
+- **Shared analysis is live:** input/output peaks, envelope, attack activity, pulse/rhythm activity, MEMORY playback, measured harmonic output activity and a conservative monophonic root estimate.
+- Audio publishes analysis into atomic values, and the JUCE UI polls at 30 Hz (no UI work in the audio callback).
+- **Functional preset browser:** category/search/favorites, 20 usable factory starter patches, previous/next, user XML save/load, two-step delete confirmation, and user-specific favorite persistence.
+- **Working FR/EN choice**, default FR, applied to all engine panels, shared analysis, macros, master bus, menus, routes and browser; language and last page are stored with the DAW session.
 - Standalone, JUCE-free DSP smoke tests, and cross-platform GitHub Actions builds.
 
 Not yet implemented:
 - REACTION matrix and EVOLUTION ecosystem controller.
-- 100 factory presets, preset browser and user preset storage.
-- Active French/English localization switch (FR displayed; EN currently disabled).
+- The complete set of 100 individually designed, auditioned and loudness-balanced factory presets (20 starter patches exist, not claimed as finalized).
+- Final listening QA, nuanced translation QA and any remaining design refinements after in-DAW testing.
 - Production-level audio validation and signed/notarized installers.
 
 No feature listed above as pending is represented as complete in the UI.
+
+## Analysis, preset browser and languages — phase 5
+
+The shared analysis panel now reads real audio-engine measurements:
+- RMS-like smoothed input envelope and onset activity from the DSP
+- pulse-related rhythmic activity and MEMORY playback activity
+- absolute measured harmonic contribution (not a decorative meter)
+- conservative zero-crossing monophonic root detection, shown as a dash if unavailable
+- actual per-block input and output peaks in the upper bar
+- 30 Hz atomic transfer from the audio thread to the UI; no repaint on the audio callback
+
+The preset browser uses native JUCE controls, with the original midnight-blue and gold palette.
+Factory presets **always reset all 97 APVTS parameters to declared defaults before applying
+their named changes**. User presets save and restore complete APVTS XML to the per-user
+application-data directory, never to the plugin bundle; favorites persist independently.
+The browser supports category filtering, text search, keyboard/double-click loading, favorites,
+previous/next navigation, saving user presets and confirmed deletion. The current preset name
+is preserved in the host state. The initial 20 factory entries are a **starter library** across
+10 categories, not a substitute for the requested final collection of 100 professionally
+auditioned presets.
+
+FR is the default, and FR/EN are changeable live. The language choice is a UI-only
+DAW-session property, not a host-automatable DSP parameter. APVTS IDs never change.
+The native window remains 1200 × 748, fixed-size, without scrolling.
+Future releases still need an in-host visual review and listening QA.
 
 ## DSP, macros and master bus — phase 4
 
@@ -133,10 +162,10 @@ Source: `Source/Dsp/BiosphereDSP.h` is independent of JUCE, enabling determinist
 
 ## Next milestones
 
-1. Stabilize macOS ARM64 AU/VST3 and Windows VST3 builds.
-2. Add configurable inter-engine REACTION modulation routing.
-3. Add deterministic four-state EVOLUTION controller.
-4. Implement factory/user preset browser and 100 individually designed presets.
-5. Extend FR/EN localization, QA, performance optimization and deployment.
+1. Check Phase-5 AU/VST3 artifacts and visually validate the exact 13-inch editor in DAWs.
+2. Complete the REACTION modulation routes and four-state EVOLUTION audio controllers.
+3. Design, audition and balance all 100 final factory presets.
+4. Verify bilingual presentation and UI spacing in real hosts; finish stability/CPU tests.
+5. Apple Developer ID signing, notarization and Windows release preparation.
 
 © Liberty Music Software. All rights reserved. No redistribution license is granted by this repository.
