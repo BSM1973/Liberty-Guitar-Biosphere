@@ -34,16 +34,30 @@ public:
     void cancel() noexcept { learnTarget_.store(-1, std::memory_order_release); }
     int learnTarget() const noexcept { return learnTarget_.load(std::memory_order_acquire); }
 
+    // A CC can control one parameter at a time. Reassigning a CC removes
+    // its previous owner, preventing accidental multi-parameter jumps.
     void assign(int index, int channel, int controller) noexcept
     {
-        if (valid(index))
-            assignments_[static_cast<std::size_t>(index)].store(
-                encode(channel, controller), std::memory_order_release);
+        if (!valid(index)) return;
+        const int code = encode(channel, controller);
+        if (code < 0) { clear(index); return; }
+        for (std::size_t i = 0; i < assignments_.size(); ++i)
+            if (static_cast<int>(i) != index
+                && assignments_[i].load(std::memory_order_relaxed) == code)
+            {
+                assignments_[i].store(-1, std::memory_order_release);
+                pending_[i].store(-1, std::memory_order_release);
+            }
+        pending_[static_cast<std::size_t>(index)].store(-1, std::memory_order_release);
+        assignments_[static_cast<std::size_t>(index)].store(code, std::memory_order_release);
     }
     void clear(int index) noexcept
     {
         if (valid(index))
+        {
             assignments_[static_cast<std::size_t>(index)].store(-1, std::memory_order_release);
+            pending_[static_cast<std::size_t>(index)].store(-1, std::memory_order_release);
+        }
         if (learnTarget() == index) cancel();
     }
     void clearAll() noexcept
@@ -67,7 +81,7 @@ public:
         const int learn = learnTarget_.exchange(-1, std::memory_order_acq_rel);
         if (valid(learn))
         {
-            assignments_[static_cast<std::size_t>(learn)].store(code, std::memory_order_release);
+            assign(learn, channel, controller);
             // Last learned target recorded for status in editor.
             lastLearn_.store((learn << 12) | code, std::memory_order_release);
         }
