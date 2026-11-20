@@ -23,6 +23,11 @@ jobs:
         run: |
           python3 tools/check_premium_gate.py --schema-only
           bash -n tools/macos_sign_notarize.sh
+      - name: Test lock-free MIDI Learn and parameter-routing audit
+        run: |
+          c++ -std=c++20 -O2 -Wall -Wextra -Werror -ISource Tests/MidiLearnSmoke.cpp -o biosphere-midi-learn-tests
+          ./biosphere-midi-learn-tests
+          python3 Tests/verify_midi_learn.py
       - name: Build DSP test without JUCE
         run: c++ -std=c++20 -O2 -Wall -Wextra -Werror -ISource Tests/DspSmoke.cpp -o biosphere-dsp-tests
       - name: Run DSP test
@@ -122,6 +127,16 @@ jobs:
           name: Guitar-Biosphere-macOS-pluginval-reports
           path: ${{ runner.temp }}/guitar-biosphere-pluginval/
           if-no-files-found: ignore
+      - name: Create and verify unsigned macOS AU/VST3 installer
+        shell: bash
+        run: bash tools/macos_package_qa.sh 0.5.0
+      - name: Upload macOS technical test installer PKG
+        uses: actions/upload-artifact@v4
+        with:
+          name: Guitar-Biosphere-macOS-ARM64-PKG-UNSIGNED-TEST
+          path: release-output/*.pkg
+          if-no-files-found: error
+          compression-level: 0
       - name: Upload unsigned macOS plugins
         uses: actions/upload-artifact@v4
         with:
@@ -167,6 +182,37 @@ jobs:
           name: Guitar-Biosphere-Windows-pluginval-reports
           path: ${{ runner.temp }}/guitar-biosphere-pluginval/
           if-no-files-found: ignore
+      - name: Ensure Inno Setup 6 is available on Windows runner
+        shell: pwsh
+        run: |
+          $compiler = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Inno Setup 6/ISCC.exe'
+          if (!(Test-Path -LiteralPath $compiler) -and !(Get-Command ISCC.exe -ErrorAction SilentlyContinue)) {
+            choco install innosetup -y --no-progress --limit-output
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed' }
+          }
+      - name: Create and verify unsigned Windows Inno Setup EXE
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File tools/windows_package.ps1 0.5.0 UNSIGNED-TEST
+          if ($LASTEXITCODE -ne 0) { throw 'Windows installer packaging failed' }
+      - name: Test actual Windows installer on disposable CI runner
+        shell: pwsh
+        run: |
+          $setup = 'release-output/Guitar-Biosphere-v0.5.0-Windows-x64-UNSIGNED-TEST.exe'
+          $installed = Join-Path ([Environment]::GetFolderPath('CommonProgramFiles')) 'VST3/Guitar Biosphere.vst3'
+          $p = Start-Process -FilePath (Resolve-Path -LiteralPath $setup).Path -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "Windows installer failed with exit code $($p.ExitCode)" }
+          if (!(Test-Path -LiteralPath $installed -PathType Container)) { throw 'Windows installer did not install VST3' }
+          $native = @(Get-ChildItem -LiteralPath $installed -Filter '*.vst3' -File -Recurse)
+          if ($native.Count -ne 1) { throw 'Installed Windows VST3 missing executable' }
+          Write-Host 'PASS: silent Windows EXE installation wrote real VST3 bundle'
+      - name: Upload Windows technical test installer EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: Guitar-Biosphere-Windows-x64-EXE-UNSIGNED-TEST
+          path: release-output/*.exe
+          if-no-files-found: error
+          compression-level: 0
       - name: Upload unsigned Windows plugin
         uses: actions/upload-artifact@v4
         with:
