@@ -31,7 +31,7 @@ assert 'juce::String::fromUTF8("Évolution")' in panels
 assert 'juce::String::fromUTF8("Paramètre : ")' in panels
 
 library = sources["Source/Ui/PresetLibrary.cpp"]
-assert "item.name = juce::String::fromUTF8(name);" in library
+assert "item.name = juce::String::fromUTF8(patch.name.c_str());" in library
 catalog = (root / "Source/Ui/FactoryPresetCatalog.h").read_text(encoding="utf-8")
 assert catalog.count('append("') == 20
 assert "std::array<Design, 80>" in catalog
