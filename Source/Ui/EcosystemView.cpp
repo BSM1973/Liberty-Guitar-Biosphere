@@ -54,6 +54,19 @@ void EcosystemView::setSelectedEngine(int index)
     repaint();
 }
 
+void EcosystemView::setLivingState(int state, float energy)
+{
+    const int nextState = juce::jlimit(0, 3, state);
+    const float nextEnergy = std::isfinite(energy)
+        ? juce::jlimit(0.0f, 1.0f, energy) : 0.0f;
+    if (livingState_ != nextState || std::abs(livingEnergy_ - nextEnergy) >= 0.015f)
+    {
+        livingState_ = nextState;
+        livingEnergy_ = nextEnergy;
+        repaint();
+    }
+}
+
 void EcosystemView::resized()
 {
     for (int i = 0; i < EngineNavigationState::pageCount; ++i)
@@ -118,13 +131,20 @@ void EcosystemView::paint(juce::Graphics& g)
     g.drawFittedText(tr(juce::String::fromUTF8("ÉTAT VIVANT"), english_),
                      static_cast<int>(centre.x - 30), static_cast<int>(centre.y - 19), 60, 16,
                      juce::Justification::centred, 1);
+    // The living state is read from the real DSP, not a decorative animation.
+    const char* livingFrench = livingState_ == 1 ? "CROISSANCE"
+                              : livingState_ == 2 ? "TEMPÊTE"
+                              : livingState_ == 3 ? "DÉCLIN" : "CALME";
     g.setColour(white);
-    g.setFont(juce::Font(juce::FontOptions(13.5f, juce::Font::bold)));
-    g.drawFittedText(tr("CALME", english_), static_cast<int>(centre.x - 30),
-                     static_cast<int>(centre.y - 2), 60, 24, juce::Justification::centred, 1);
-    g.setColour(gold);
-    g.drawLine(centre.x - 17.0f, centre.y + 21.0f,
-               centre.x + 17.0f, centre.y + 21.0f, 2.0f);
+    g.setFont(juce::Font(juce::FontOptions(11.8f, juce::Font::bold)));
+    g.drawFittedText(tr(juce::String::fromUTF8(livingFrench), english_),
+                     static_cast<int>(centre.x - 30), static_cast<int>(centre.y - 2),
+                     60, 24, juce::Justification::centred, 1);
+    g.setColour(livingState_ == 2 ? gold : blue);
+    // Small activity bar stays inside the pre-existing 64px hub.
+    const float barWidth = 34.0f * livingEnergy_;
+    g.fillRoundedRectangle(centre.x - 17.0f, centre.y + 20.0f,
+                           barWidth, 2.0f, 1.0f);
 
     for (int i = 0; i < 6; ++i)
     {
