@@ -9,6 +9,11 @@ include(CTest)
 
 # Unit tests for the JUCE-independent DSP core.
 if(BUILD_TESTING)
+    add_executable(BiosphereMidiLearnTests Tests/MidiLearnSmoke.cpp)
+    target_include_directories(BiosphereMidiLearnTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
+    target_compile_features(BiosphereMidiLearnTests PRIVATE cxx_std_20)
+    add_test(NAME BiosphereMidiLearnTests COMMAND BiosphereMidiLearnTests)
+
     add_executable(BiospherePremiumStabilityTests Tests/PremiumStability.cpp)
     target_include_directories(BiospherePremiumStabilityTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
     target_compile_features(BiospherePremiumStabilityTests PRIVATE cxx_std_20)
