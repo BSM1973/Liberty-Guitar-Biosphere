@@ -165,7 +165,12 @@ void GuitarBiosphereAudioProcessorEditor::timerCallback()
     presetLab_.tick();
     refreshPresetLabButtons();
     const int learned = processor_.consumeMidiLearnNotification();
-    if (learned >= 0 || processor_.midiLearnTarget() >= 0)
+    if (learned >= 0)
+    {
+        lastLearnBinding_ = biosphere::midi::LearnRouter::learnedBinding(learned);
+        updateMidiStatus();
+    }
+    else if (processor_.midiLearnTarget() >= 0)
         updateMidiStatus();
     const auto& m = processor_.analysis;
     analysis_.setValues({
@@ -359,6 +364,9 @@ void GuitarBiosphereAudioProcessorEditor::showMidiMenu(
     menu.addItem(2, english ? "Remove this MIDI assignment"
                             : juce::String::fromUTF8("Effacer cette affectation MIDI"),
                  mapped >= 0);
+    menu.addItem(4, english ? "Cancel MIDI Learn"
+                             : juce::String::fromUTF8("Annuler l'apprentissage MIDI"),
+                 processor_.midiLearnTarget() >= 0);
     menu.addSeparator();
     menu.addItem(3, english ? "Clear all MIDI assignments"
                             : juce::String::fromUTF8("Effacer toutes les affectations MIDI"));
@@ -370,6 +378,8 @@ void GuitarBiosphereAudioProcessorEditor::showMidiMenu(
             if (chosen == 1) safe->processor_.armMidiLearn(id);
             else if (chosen == 2) safe->processor_.clearMidiLearn(id);
             else if (chosen == 3) safe->processor_.clearAllMidiLearn();
+            else if (chosen == 4) safe->processor_.cancelMidiLearn();
+            if (chosen > 0) safe->lastLearnBinding_ = -1;
             safe->updateMidiStatus();
         });
 }
@@ -382,6 +392,14 @@ void GuitarBiosphereAudioProcessorEditor::updateMidiStatus()
     {
         midiLearnStatus_.setText(
             (english ? "MIDI: waiting for CC" : "MIDI : attendre un CC"),
+            juce::dontSendNotification);
+    }
+    else if (lastLearnBinding_ >= 0)
+    {
+        const int cc = biosphere::midi::LearnRouter::controllerOf(lastLearnBinding_);
+        const int channel = biosphere::midi::LearnRouter::channelOf(lastLearnBinding_);
+        midiLearnStatus_.setText("MIDI : CC " + juce::String(cc)
+            + (english ? " / Ch " : " / Canal ") + juce::String(channel),
             juce::dontSendNotification);
     }
     else
