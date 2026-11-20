@@ -146,6 +146,9 @@ public:
         memoryHasCapture_ = false;
         smoothed_ = false;
         wetBypass_ = 1.0f;
+        pulseTapFade_ = 1.0f;
+        pulseDelayCurrent_ = pulseDelayOld_ = 0;
+        pulseFeedbackTone_.fill(0.0f);
         guitarPitch_.reset();
         trackedRoot_ = pitchConfidence_ = smoothedHarmonicRoot_ = 0.0f;
         trackedMidiNote_ = -1;
@@ -204,6 +207,8 @@ public:
         const int fadeSamples = std::max(5, static_cast<int>(sampleRate_ * p.memoryFade * 0.001f));
         const int delaySamples = std::clamp(static_cast<int>(sampleRate_ / std::max(0.1f, rate)),
                                             64, static_cast<int>(pulseCapacity_ - 2));
+        const float pulseTapStep = static_cast<float>(
+            1.0 / std::max(64.0, sampleRate_ * 0.045)); // 45 ms crossfade
         const bool freeze = p.globalFreeze || p.memoryFreeze;
 
         if (!smoothed_)
@@ -214,6 +219,8 @@ public:
             smoothedWidth_ = p.globalWidth;
             smoothedIntensity_ = p.globalIntensity;
             smoothedHarmonicRoot_ = p.rootHz;
+            pulseDelayCurrent_ = pulseDelayOld_ = delaySamples;
+            pulseTapFade_ = 1.0f;
             wetBypass_ = p.bypass ? 0.0f : 1.0f;
             smoothed_ = true;
         }
@@ -228,6 +235,18 @@ public:
             smoothedWidth_ += smooth * (p.globalWidth - smoothedWidth_);
             smoothedIntensity_ += smooth * (p.globalIntensity - smoothedIntensity_);
             wetBypass_ += smooth * ((p.bypass ? 0.0f : 1.0f) - wetBypass_);
+
+            // PULSE PRO: independently crossfade old/new delay read heads
+            // after tempo changes, rather than jumping the circular-buffer
+            // index (which makes a broadband click).
+            if (pulseTapFade_ >= 1.0f && pulseDelayCurrent_ != delaySamples)
+            {
+                pulseDelayOld_ = pulseDelayCurrent_;
+                pulseDelayCurrent_ = delaySamples;
+                pulseTapFade_ = 0.0f;
+            }
+            if (pulseTapFade_ < 1.0f)
+                pulseTapFade_ = std::min(1.0f, pulseTapFade_ + pulseTapStep);
 
             std::array<float, 2> raw {}, dry {}, delta {};
             float level = 0.0f;
@@ -415,11 +434,20 @@ public:
 
                 // PULSE: rhythmic modulation plus a bounded synchronised feedback echo.
                 float pulseDelta = 0.0f;
-                const auto delayedPosition = (pulseWrite_ + pulseCapacity_
-                    - static_cast<std::size_t>(delaySamples)) % pulseCapacity_;
-                const float delayed = pulseBuffer_[ch][delayedPosition];
-                pulseBuffer_[ch][pulseWrite_] = std::clamp(dry[ch] + delayed
-                                                 * p.pulseFeedback * 0.72f, -2.0f, 2.0f);
+                const auto readDelayTap = [&](int delay) noexcept
+                {
+                    return pulseBuffer_[ch][(pulseWrite_ + pulseCapacity_
+                        - static_cast<std::size_t>(delay)) % pulseCapacity_];
+                };
+                const float oldTap = readDelayTap(pulseDelayOld_);
+                const float newTap = readDelayTap(pulseDelayCurrent_);
+                const float delayed = oldTap + (newTap - oldTap) * pulseTapFade_;
+                // Band-limit the feedback loop and apply soft saturation.
+                // The wet delay tap stays full-band; only recirculated energy
+                // is progressively damped so multiple echoes do not scream.
+                pulseFeedbackTone_[ch] += 0.38f * (delayed - pulseFeedbackTone_[ch]);
+                pulseBuffer_[ch][pulseWrite_] = std::tanh(dry[ch]
+                        + pulseFeedbackTone_[ch] * p.pulseFeedback * 0.72f);
                 if (p.pulseActive && pulseDepth > 0.0001f)
                 {
                     const float stereoPhase = channel == 1
@@ -664,6 +692,9 @@ private:
     float memoryActivity_ = 0.0f, tonalEnergy_ = 0.0f;
     float smoothedInput_ = 1.0f, smoothedOutput_ = 1.0f, smoothedMix_ = 0.65f;
     float smoothedWidth_ = 0.8f, smoothedIntensity_ = 0.5f, wetBypass_ = 1.0f;
+    int pulseDelayCurrent_ = 0, pulseDelayOld_ = 0;
+    float pulseTapFade_ = 1.0f;
+    std::array<float, 2> pulseFeedbackTone_ {};
     GuitarPitchTracker guitarPitch_;
     float trackedRoot_ = 0.0f, pitchConfidence_ = 0.0f;
     float smoothedHarmonicRoot_ = 0.0f;
