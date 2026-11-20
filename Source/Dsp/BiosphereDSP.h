@@ -226,6 +226,8 @@ public:
         }
         const float smooth = std::clamp(static_cast<float>(1.0 - std::exp(-1.0
                                  / (sampleRate_ * 0.007))), 0.000001f, 1.0f);
+        const float harmonicTuneSmoothing = static_cast<float>(
+            1.0 - std::exp(-1.0 / (sampleRate_ * 0.022)));
 
         for (int sample = 0; sample < samples; ++sample)
         {
@@ -467,21 +469,35 @@ public:
                 {
                     const float movement = harmonicMovement
                         * std::sin(phase_ * 0.43f + voice * 1.7f);
-                    const float frequency = std::clamp(root * intervals[static_cast<std::size_t>(voice)]
-                                              * (1.0f + 0.035f * movement),
-                                              45.0f, static_cast<float>(sampleRate_ * 0.42));
-                    const double decayScale = std::clamp(static_cast<double>(p.harmonicDecay), 0.1, 9.0);
-                    const double damp = 0.65 + (1.0 - p.harmonicDamping) * 0.85;
-                    const double radius = std::exp(-frequency * damp
-                                                       / (12.0 * sampleRate_ * decayScale));
-                    const double angle = twoPi * frequency / sampleRate_;
+                    const float targetFrequency = std::clamp(
+                        root * intervals[static_cast<std::size_t>(voice)]
+                            * (1.0f + 0.035f * movement),
+                        45.0f, static_cast<float>(sampleRate_ * 0.42));
                     auto& state = resonators_[ch][static_cast<std::size_t>(voice)];
-                    const double next = (1.0 - radius) * dry[ch]
+                    // Independent per-voice tuning glide prevents abrupt
+                    // coefficient jumps when a new guitar note is detected.
+                    if (state.frequency <= 0.0f)
+                        state.frequency = targetFrequency;
+                    state.frequency += harmonicTuneSmoothing
+                                       * (targetFrequency - state.frequency);
+                    const double decayScale = std::clamp(
+                        static_cast<double>(p.harmonicDecay), 0.1, 9.0);
+                    const double damp = 0.65 + (1.0 - p.harmonicDamping) * 0.85;
+                    const double radius = std::exp(-state.frequency * damp
+                                                       / (12.0 * sampleRate_ * decayScale));
+                    const double angle = twoPi * state.frequency / sampleRate_;
+                    const double excitation = std::tanh(dry[ch] * 1.50f) * 0.78;
+                    const double next = (1.0 - radius) * excitation
                         + 2.0 * radius * std::cos(angle) * state.last
                         - radius * radius * state.previous;
                     state.previous = state.last;
                     state.last = std::clamp(next, -5.0, 5.0);
-                    harmonicDelta += static_cast<float>(std::tanh(state.last * 0.8));
+                    // Damp upper harmonics of the resonator output without
+                    // suppressing note tracking or smoothing the master dry.
+                    const float dampingMix = 0.14f + 0.42f * (1.0f - p.harmonicDamping);
+                    state.tone += dampingMix * (static_cast<float>(
+                        std::tanh(state.last * 0.85)) - state.tone);
+                    harmonicDelta += state.tone;
                 }
                 const float stereoSpread = channels == 2
                     ? (channel == 0 ? 1.0f - 0.12f * p.harmonicSpread
@@ -602,7 +618,11 @@ private:
     static constexpr double pi = 3.14159265358979323846;
     static constexpr double twoPi = 2.0 * pi;
 
-    struct Resonator { double last = 0.0, previous = 0.0; };
+    struct Resonator
+    {
+        double last = 0.0, previous = 0.0;
+        float frequency = 0.0f, tone = 0.0f;
+    };
     struct Grain
     {
         double readPosition = 0.0, speed = 1.0;
