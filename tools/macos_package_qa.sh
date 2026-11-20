@@ -14,6 +14,13 @@ mkdir -p "$stage/Library/Audio/Plug-Ins/Components" \
          "$stage/Library/Audio/Plug-Ins/VST3" release-output
 /usr/bin/ditto "$au" "$stage/Library/Audio/Plug-Ins/Components/Guitar Biosphere.component"
 /usr/bin/ditto "$vst" "$stage/Library/Audio/Plug-Ins/VST3/Guitar Biosphere.vst3"
+# This is only an unsigned TEST package; fresh ad-hoc signatures repair
+# resource seals for loaded AU/VST3 bundles. The commercial workflow later
+# replaces these with real Developer ID signatures.
+for component in "$stage/Library/Audio/Plug-Ins/Components/Guitar Biosphere.component"                  "$stage/Library/Audio/Plug-Ins/VST3/Guitar Biosphere.vst3"; do
+  /usr/bin/codesign --force --deep --sign - "$component"
+  /usr/bin/codesign --verify --deep --strict --verbose=2 "$component"
+done
 pkg="release-output/Guitar-Biosphere-v$version-macOS-ARM64-UNSIGNED-TEST.pkg"
 /usr/bin/pkgbuild --root "$stage" \
   --identifier "com.libertymusicsoftware.guitarbiosphere.installer" \
