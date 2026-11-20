@@ -172,7 +172,7 @@ int main()
         memory.mix = 0.9f;
         const auto memoryDry = render(input, memory);
         memory.reaction = settings();
-        memory.reaction.routes[0] = {true, 7, 3, 1.0f}; // Silence -> MEMORY recall
+        memory.reaction.routes[0] = {true, 1, 3, 1.0f}; // Guitar envelope -> MEMORY recall
         check(deviation(memoryDry, render(input, memory)) > 0.1,
               "REACTION failed to modulate a real MEMORY fragment");
 
