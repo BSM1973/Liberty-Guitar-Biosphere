@@ -13,6 +13,9 @@ keys = (
     "preset_100_listening_and_balance",
     "ab_undo_redo_project_reopen",
     "screen_13inch_fr_en_no_overlap",
+    "midi_learn_real_controller_and_project_reload",
+    "macos_pkg_install_reopen",
+    "windows_exe_install_reopen",
 )
 assert re.fullmatch(r"\d+\.\d+\.\d+", gate["version"])
 assert isinstance(gate["approved"], bool)
