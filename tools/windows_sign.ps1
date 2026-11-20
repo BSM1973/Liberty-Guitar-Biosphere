@@ -1,4 +1,4 @@
-# Fail closed: Windows Authenticode-signed VST3 ZIP only.
+# Fail closed: Authenticode-sign native VST3 and actual Windows EXE installer.
 $ErrorActionPreference = 'Stop'
 if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_PFX_BASE64) -or
     [string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_PFX_PASSWORD)) {
@@ -22,13 +22,21 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Authenticode signing failed' }
     & $signTool verify /pa /v $binary[0].FullName
     if ($LASTEXITCODE -ne 0) { throw 'Authenticode verification failed' }
-    New-Item -ItemType Directory -Force -Path 'release-output' | Out-Null
-    $archive = "release-output/Guitar-Biosphere-v$version-Windows-x64-SIGNED-VST3.zip"
-    Compress-Archive -LiteralPath $bundle -DestinationPath $archive -CompressionLevel Optimal -Force
-    if ((Get-Item -LiteralPath $archive).Length -lt 100000) { throw 'Signed ZIP unexpectedly small' }
-    $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
-    "Windows signed VST3 SHA256: $hash" | Out-File -FilePath 'release-output/SHA256.txt'
-    Write-Host 'PASS: Authenticode-signed and verified Windows VST3'
+    # Inno Setup packages the ALREADY signed VST3 binary. The installer
+    # itself is signed separately and only renamed SIGNED after verification.
+    pwsh -NoProfile -File tools/windows_package.ps1 "$version" 'CANDIDATE'
+    if ($LASTEXITCODE -ne 0) { throw 'Windows Inno Setup packaging failed' }
+    $candidate = "release-output/Guitar-Biosphere-v$version-Windows-x64-CANDIDATE.exe"
+    if (!(Test-Path -LiteralPath $candidate -PathType Leaf)) { throw 'EXE candidate missing' }
+    & $signTool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /f $pfx /p $env:WINDOWS_SIGNING_PFX_PASSWORD $candidate
+    if ($LASTEXITCODE -ne 0) { throw 'Installer Authenticode signing failed' }
+    & $signTool verify /pa /v $candidate
+    if ($LASTEXITCODE -ne 0) { throw 'Installer Authenticode verification failed' }
+    $final = "release-output/Guitar-Biosphere-v$version-Windows-x64-AUTHENTICODE-SIGNED.exe"
+    Move-Item -LiteralPath $candidate -Destination $final -Force
+    $hash = (Get-FileHash -LiteralPath $final -Algorithm SHA256).Hash
+    "Windows signed installer SHA256: $hash" | Out-File -FilePath 'release-output/SHA256.txt'
+    Write-Host 'PASS: signed and verified VST3 AND Windows EXE installer'
 } finally {
     Remove-Item -LiteralPath $pfx -Force -ErrorAction SilentlyContinue
 }
