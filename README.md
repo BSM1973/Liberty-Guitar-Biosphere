@@ -3,7 +3,7 @@
 
 Native C++20 / JUCE 8 guitar audio-effect plugin for macOS (AU / VST3) and Windows (VST3).
 
-## Development status — Phase 10
+## Development status — Phase 11 (VALIDATION PREMIUM / RELEASE CANDIDATE)
 
 This is an **early functional DSP foundation**, not a finished commercial product.
 
@@ -51,6 +51,63 @@ Not yet implemented:
 - Production-level audio validation and signed/notarized installers.
 
 No feature listed above as pending is represented as complete in the UI.
+
+## VALIDATION PREMIUM — Phase 11
+
+**Status:** DSP hardening integrated; the release candidate is not yet a
+signed, notarized commercial product. The real DAW and 100-preset listening
+sign-off remains **pending**, and the commercial gate intentionally defaults
+to **DENY**.
+
+### DSP stability and real-time work
+
+- Before modulation mapping, finite-check every incoming numeric host control
+  and bound REACTION/EVOLUTION routes; validate again after macro mapping.
+- Malformed NaN/Inf audio input is replaced with safe zeros before it can reach
+  PULSE, HARMONIC or MEMORY recirculation buffers. Invalid sample rates cannot
+  cause unbounded audio buffer allocations at prepare().
+- Share three harmonic movement oscillators between the left and right
+  channels, calculate nonlinear resonator excitation once/channel, and move
+  block-constant coefficients outside the audio sample/voice loops.
+- New **PremiumStability** regression: 44.1/48/96 kHz, both 1- and 2-channel
+  layouts, 1/16/32/64/127/256/512/2048 sample blocks, rapid automation,
+  invalid host input, stop/restart and zero audio-thread heap allocations.
+
+### Host-format tests and honest scope
+
+The cross-platform CI now runs **Tracktion pluginval** on real built
+AU/VST3 macOS and VST3 Windows, with a pinned action commit, 5/10 strictness,
+headless API validation and stored JUnit reports. A red validator **fails
+the build**, even if compilation and the C++ tests succeed.
+
+This is host API validation, **not** a claim that tests in Logic, Ableton,
+REAPER or another DAW were carried out. Real GUI/audio behavior on a
+13-inch display, all 100 preset listening/level comparisons and project
+recall must still be checked. See **docs/PREMIUM_QA.md**.
+
+### Signed distribution — safe, explicit gates
+
+The new **.github/workflows/commercial-release.yml** is manual and
+restricted to a trusted main branch. It checks version and a documented
+manual DAW approval file **before** accessing signing credentials:
+
+- macOS: imports existing Liberty-style Developer ID Application + Installer
+  certificates, signs both native plugin formats and the .pkg installer,
+  requires an Apple notarytool result of **Accepted**, staples the ticket,
+  verifies Gatekeeper and the *downloaded* artifact
+- Windows: uses a separate trusted Authenticode PFX to sign the internal
+  VST3 executable, timestamp it, verify the certificate chain and check
+  the downloaded signed ZIP SHA256
+- Missing certificate secrets or incomplete manual QA **must never**
+  produce a falsely labelled commercial artifact
+
+Apple signing requires six Action secrets, as with Organix; Windows signing
+needs a PFX and its password configured for this repository. Repository
+secrets are not copied automatically from another Liberty plugin.
+
+**No commercial signed builds have been produced merely by adding this
+workflow.** The project version remains 0.5.0 until a reviewed release
+decision. Standard Actions binaries are unsigned test artifacts.
 
 ## PRESET LAB — phase 10
 
