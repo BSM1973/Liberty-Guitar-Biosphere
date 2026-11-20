@@ -129,10 +129,26 @@ void PresetLibrary::refresh()
     addFactory("19 - Growing Ecosystem", "PERFORMANCE ECOSYSTEMS",
                {{"mix", 0.82f}, {"harmonic", 0.60f}, {"mutation", 0.48f},
                 {"macro.growth", 0.94f}, {"macro.motion", 0.74f}});
+    // Existing preset #20 becomes an immediate musical REACTION demo:
+    // pick attack -> PULSE -> harmonic motion -> MEMORY ghost fragments.
+    // Keep exactly 20 factory starters; the final 100 are separate work.
     addFactory("20 - The Living Guitar", "PERFORMANCE ECOSYSTEMS",
-               {{"mix", 0.84f}, {"pulse", 0.54f}, {"harmonic", 0.57f},
-                {"mutation", 0.39f}, {"memory", 0.51f},
-                {"macro.energy", 0.70f}, {"macro.space", 0.78f}});
+               {{"mix", 0.84f}, {"pulse", 0.72f}, {"harmonic", 0.78f},
+                {"mutation", 0.39f}, {"memory", 0.74f},
+                {"mem.length", 0.58f}, {"mem.recall", 0.53f},
+                {"macro.energy", 0.70f}, {"macro.space", 0.78f},
+                {"react.active", 1.0f}, {"react.reactivity", 0.88f},
+                {"react.interaction", 0.90f}, {"react.sensitivity", 0.90f},
+                {"react.response", 45.0f}, {"react.complexity", 0.32f},
+                {"react.route1.active", 1.0f}, {"react.route1.source", 0.0f},
+                {"react.route1.destination", 1.0f}, {"react.route1.amount", 0.98f},
+                {"react.route2.active", 1.0f}, {"react.route2.source", 2.0f},
+                {"react.route2.destination", 2.0f}, {"react.route2.amount", 0.88f},
+                {"react.route3.active", 1.0f}, {"react.route3.source", 3.0f},
+                {"react.route3.destination", 3.0f}, {"react.route3.amount", 0.88f},
+                {"react.route4.active", 0.0f}, {"react.route5.active", 0.0f},
+                {"react.route6.active", 0.0f}, {"react.route7.active", 0.0f},
+                {"react.route8.active", 0.0f}});
 
     juce::Array<juce::File> files;
     directory().findChildFiles(files, juce::File::findFiles, false, "*.xml");
