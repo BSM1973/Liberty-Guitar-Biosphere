@@ -165,6 +165,7 @@ void GuitarBiosphereAudioProcessorEditor::timerCallback()
     presetLab_.tick();
     refreshPresetLabButtons();
     const int learned = processor_.consumeMidiLearnNotification();
+    if (learned >= 0) lastMidiLearned_ = learned;
     if (learned >= 0 || processor_.midiLearnTarget() >= 0)
         updateMidiStatus();
     const auto& m = processor_.analysis;
@@ -368,8 +369,16 @@ void GuitarBiosphereAudioProcessorEditor::showMidiMenu(
         {
             if (safe == nullptr) return;
             if (chosen == 1) safe->processor_.armMidiLearn(id);
-            else if (chosen == 2) safe->processor_.clearMidiLearn(id);
-            else if (chosen == 3) safe->processor_.clearAllMidiLearn();
+            else if (chosen == 2)
+            {
+                safe->processor_.clearMidiLearn(id);
+                safe->lastMidiLearned_ = -1;
+            }
+            else if (chosen == 3)
+            {
+                safe->processor_.clearAllMidiLearn();
+                safe->lastMidiLearned_ = -1;
+            }
             safe->updateMidiStatus();
         });
 }
@@ -382,6 +391,15 @@ void GuitarBiosphereAudioProcessorEditor::updateMidiStatus()
     {
         midiLearnStatus_.setText(
             (english ? "MIDI: waiting for CC" : "MIDI : attendre un CC"),
+            juce::dontSendNotification);
+    }
+    else if (lastMidiLearned_ >= 0)
+    {
+        const int binding = biosphere::midi::LearnRouter::learnedBinding(lastMidiLearned_);
+        midiLearnStatus_.setText(
+            "MIDI CC" + juce::String(biosphere::midi::LearnRouter::controllerOf(binding))
+            + (english ? " Ch." : " Can.")
+            + juce::String(biosphere::midi::LearnRouter::channelOf(binding)),
             juce::dontSendNotification);
     }
     else
