@@ -145,7 +145,12 @@ bool PresetLibrary::saveUser(juce::String name)
         lastError_ = "This preset name already exists";
         return false;
     }
-    auto xml = state_.copyState().createXml();
+    auto presetState = state_.copyState();
+    // A/B states are DAW-session information, not part of an exported
+    // individual user sound. Avoid embedding two unrelated presets in XML.
+    if (auto lab = presetState.getChildWithName("PRESET_LAB"); lab.isValid())
+        presetState.removeChild(lab, nullptr);
+    auto xml = presetState.createXml();
     if (!xml || !file.replaceWithText(xml->toString()))
     {
         lastError_ = "Cannot write preset file";
