@@ -109,6 +109,43 @@ secrets are not copied automatically from another Liberty plugin.
 workflow.** The project version remains 0.5.0 until a reviewed release
 decision. Standard Actions binaries are unsigned test artifacts.
 
+## PHASE 12 — MIDI Learn and installable test builds
+
+- Right-click a parameter dial, toggle or selector and choose
+  **Apprendre le prochain CC MIDI / MIDI Learn: next CC**.
+- Move a hardware MIDI controller while the DAW forwards MIDI to the plugin.
+  The CC number **and MIDI channel (1–16)** are learned and the status line
+  confirms the controller and channel. Use the same menu to cancel learning,
+  delete an assignment or clear all assignments.
+- Each MIDI CC controls at most one parameter. Reassignment clears the old
+  owner and stale automation. MIDI events use lock-free atomics and JUCE host
+  notifications are performed on the message thread, not the audio callback.
+- MIDI bindings are included in DAW project state without changing any of
+  the 97 host parameter IDs. The standalone MIDI Learn C++ test is included in
+  Linux CI and CTest on native platforms.
+- **macOS ARM64 internal tests:** the ordinary native CI prepares an
+  **UNSIGNED-TEST.pkg** installing both AU and VST3 into the system plugin
+  folders. It is neither notarized nor suitable for customer distribution.
+- **Windows x64 internal tests:** native CI compiles an
+  **UNSIGNED-TEST-Setup.exe** with Inno Setup 6, installing the VST3 in
+  `C:\Program Files\Common Files\VST3`. The setup has FR/EN installer language
+  support and an uninstaller.
+- **Commercial builds:** the existing manual premium release gate remains
+  DENY until all hands-on DAW, 100-preset listening and UI approvals are
+  recorded. After approval, the macOS workflow signs and notarizes the .pkg;
+  Windows signs the VST3 *and* the .exe with Authenticode, timestamps both,
+  checks signatures and hashes the re-downloaded artifacts. No signature or
+  notarization claim is made before those checks pass.
+
+### Required manual MIDI acceptance
+
+In Logic Pro (AU), Ableton Live (VST3) and REAPER (Windows VST3), route MIDI
+to the audio effect; learn a knob, turn it while audio plays, learn a discrete
+switch, save/reopen the DAW project and confirm the mapping is restored.
+Also verify CC/channel filtering, reassignment, cancellation and no surprise
+parameter changes after clearing a mapping. The receiving DAW track must
+actually forward MIDI to this audio plugin for MIDI Learn to work.
+
 ## PRESET LAB — phase 10
 
 **100 functional factory patches across 10 musical categories.**
