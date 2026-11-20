@@ -117,6 +117,8 @@ EnginePanel::EnginePanel(juce::AudioProcessorValueTreeState& state, juce::String
             for (int choice = 0; choice < destinationNames.size(); ++choice)
                 route->destination.addItem(destinationNames[choice], choice + 1);
             route->source.setSelectedId(i + 1, juce::dontSendNotification);
+            route->source.setTooltip(juce::String::fromUTF8(
+                "Source réelle issue du signal DSP. ÉVOLUTION restera silencieuse tant que son moteur n'existe pas."));
             route->destination.setSelectedId(i + 1, juce::dontSendNotification);
             addAndMakeVisible(route->source);
             addAndMakeVisible(route->destination);
@@ -302,7 +304,7 @@ ReactionPanel::ReactionPanel(juce::AudioProcessorValueTreeState& state)
         ControlSpec::dial("Sensibilité", "react.sensitivity", 0, 1, 0.55f, " %"),
         ControlSpec::dial("Réponse", "react.response", 30, 500, 120, " ms"),
         ControlSpec::dial("Complexité", "react.complexity", 0, 1, 0.65f, " %")
-    }, false) {}
+    }, true) {}
 
 MemoryPanel::MemoryPanel(juce::AudioProcessorValueTreeState& state)
     : EnginePanel(state, "05", "MEMORY", "Votre jeu récent revient en fragments, souvenirs et notes fantômes.",

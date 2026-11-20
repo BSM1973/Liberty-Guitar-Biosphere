@@ -6,12 +6,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <vector>
+#include "ReactionMatrix.h"
 
 namespace biosphere
 {
 // All controls are copied from APVTS at block boundaries by the processor.
-// REACTION and EVOLUTION retain separate parameter state: their modulation
-// engines are NOT implemented in Phase 4.
+// REACTION uses eight cross-engine APVTS routes; EVOLUTION remains separate.
 struct Parameters
 {
     // Legacy public host IDs — keep names/defaults for existing tests/sessions.
@@ -47,6 +47,9 @@ struct Parameters
     float memoryLength = 3.0f, memoryCapture = 0.8f, memoryRecall = 0.48f;
     float memoryReverse = 0.25f, memoryFade = 45.0f;
     int memoryRepeat = 0;
+
+    // Eight configurable links; IDs and choice indices match Phase-2 APVTS.
+    ReactionSettings reaction;
 };
 
 // Published only AFTER processing a block. The processor transfers these
@@ -115,6 +118,7 @@ public:
             memoryBuffer_[channel].assign(memoryCapacity_, 0.0f);
             pulseBuffer_[channel].assign(pulseCapacity_, 0.0f);
         }
+        reactionMatrix_.prepare(sampleRate_);
         reset();
     }
 
@@ -137,6 +141,9 @@ public:
         zeroCrossCounter_ = 0;
         lastPeriod_ = 0;
         noiseSeed_ = 0x8fe34ae1u;
+        reactionMatrix_.reset();
+        pulseSource_ = harmonicSource_ = grainSource_ = memorySource_ = 0.0f;
+        previousMemoryExcitation_ = 0.0f;
         for (auto& channel : resonators_)
             for (auto& state : channel) state = {};
         for (auto& channel : grains_)
@@ -158,6 +165,7 @@ public:
             return;
 
         const Parameters p = sanitise(mapPerformanceControls(requested));
+        reactionMatrix_.configure(p.reaction.responseMs, p.reaction.reactivity);
         const float tempo = p.hasHostBpm ? p.hostBpm : 120.0f;
         const float beatHz = tempo / 60.0f;
         constexpr std::array<float, 5> divisions { 1, 2, 3, 4, 6 };
@@ -165,13 +173,13 @@ public:
         const float rate = (p.globalSync && p.pulseSync && p.hasHostBpm)
             ? beatHz * divisions[static_cast<std::size_t>(division)] * p.globalSpeed
             : p.rateHz * p.globalSpeed;
-        const float phaseIncrement = static_cast<float>(twoPi / sampleRate_)
+        const float basePhaseIncrement = static_cast<float>(twoPi / sampleRate_)
             * std::clamp(rate, 0.08f, 24.0f);
         const float grainLengthSeconds = p.grainMs * 0.001f;
         const int grainLength = std::clamp(static_cast<int>(sampleRate_ * grainLengthSeconds),
                                            64, static_cast<int>(grainCapacity_ / 3));
-        const float effectiveDensity = std::clamp(p.mutationDensity, 1.0f, 80.0f);
-        const int grainSpacing = std::max(48, static_cast<int>(sampleRate_ / effectiveDensity));
+        // Grain spacing will be computed from the current reaction-modulated
+        // density on each grain trigger; there are no control-rate steps.
         const double grainPitch = std::exp2(static_cast<double>(p.mutationPitch) / 12.0);
         const int captureLength = std::clamp(static_cast<int>(sampleRate_ * p.memoryLength),
                                              64, static_cast<int>(sampleRate_ * 3.0));
@@ -228,6 +236,44 @@ public:
             if (onset) attackCooldown_ = static_cast<int>(sampleRate_ * 0.095);
             attackActivity_ = onset ? 1.0f : attackActivity_ * 0.998f;
 
+            // Cross-engine inputs use the last finished audio sample.
+            // Attack/envelope are live; PULSE, HARMONIC, GRAIN and MEMORY
+            // come from measured engine outputs, preventing algebraic loops.
+            ReactionSources reactionSources;
+            reactionSources.values = {
+                attackActivity_,
+                std::clamp(envelope_ * 5.0f, 0.0f, 1.0f),
+                pulseSource_, harmonicSource_, grainSource_, memorySource_,
+                0.0f, // EVOLUTION has no DSP yet: no fabricated activity.
+                1.0f - std::clamp(envelope_ * 6.0f, 0.0f, 1.0f)
+            };
+            const auto cross = reactionMatrix_.tick(p.reaction, reactionSources);
+            const float pulseDepth = std::clamp(p.pulse * (1.0f + 1.5f
+                * cross.at(ReactionDestination::pulseDepth)), 0.0f, 1.0f);
+            const float harmonicMovement = std::clamp(p.harmonicMotion + 0.70f
+                * cross.at(ReactionDestination::harmonicMotion), 0.0f, 1.0f);
+            const float harmonicStrength = std::clamp(p.harmonicResonance + 0.75f
+                * cross.at(ReactionDestination::harmonicResonance), 0.0f, 1.0f);
+            const float grainDensity = std::clamp(p.mutationDensity * (1.0f + 1.8f
+                * cross.at(ReactionDestination::grainDensity)), 1.0f, 80.0f);
+            const float grainMotion = std::clamp(p.mutationMotion + 0.80f
+                * cross.at(ReactionDestination::grainMotion), 0.0f, 1.0f);
+            const float memoryRecall = std::clamp(p.memoryRecall + 0.90f
+                * cross.at(ReactionDestination::memoryRecall), 0.0f, 1.0f);
+            const float memoryFeedback = std::clamp(p.memoryFeedback + 0.65f
+                * cross.at(ReactionDestination::memoryFeedback), 0.0f, 0.95f);
+            const float rateMultiplier = std::clamp(1.0f + 1.50f
+                * cross.at(ReactionDestination::pulseRate), 0.2f, 3.0f);
+
+            // HARMONIC LIFE can re-trigger a stored MEMORY fragment.
+            // Threshold + cooldown keep it musical (not one trigger/sample).
+            const float memoryExcitation = std::max(0.0f,
+                cross.at(ReactionDestination::memoryRecall));
+            const bool harmonicMemoryTrigger = p.reaction.active && p.memoryActive
+                && memoryCooldown_ == 0 && !freeze && p.memory > 0.0001f
+                && memoryExcitation > 0.004f && previousMemoryExcitation_ <= 0.004f;
+            previousMemoryExcitation_ = memoryExcitation;
+
             // Conservative zero-crossing estimate for near-monophonic inputs:
             // ignore implausible/unstable periods and fall back to the fixed root.
             if (++zeroCrossCounter_ > static_cast<int>(sampleRate_ / 55.0))
@@ -250,9 +296,10 @@ public:
             }
             lastInput_ = dry[0];
 
-            if (onset && memoryCooldown_ == 0 && p.memoryActive && !freeze
-                && p.memory > 0.0001f && p.memoryCapture > 0.0001f
-                && level > threshold * (1.20f - 0.80f * p.memoryCapture)
+            if ((onset || harmonicMemoryTrigger) && memoryCooldown_ == 0
+                && p.memoryActive && !freeze && p.memory > 0.0001f
+                && p.memoryCapture > 0.0001f
+                && (harmonicMemoryTrigger || level > threshold * (1.20f - 0.80f * p.memoryCapture))
                 && processedSamples_ > static_cast<std::size_t>(sampleRate_ * 0.35))
             {
                 // Early attacks can recall a shorter available history. No need
@@ -260,10 +307,12 @@ public:
                 memoryLength_ = std::min(captureLength,
                     static_cast<int>(processedSamples_ - 16));
                 memoryStart_ = (memoryWrite_ + memoryCapacity_
-                                - static_cast<std::size_t>(captureLength + 1)) % memoryCapacity_;
+                                - static_cast<std::size_t>(memoryLength_ + 1)) % memoryCapacity_;
                 memoryAge_ = 0;
                 memoryHasCapture_ = true;
-                memoryCooldown_ = memoryWait;
+                memoryCooldown_ = harmonicMemoryTrigger
+                    ? std::max(static_cast<int>(sampleRate_ * 0.20), memoryWait / 2)
+                    : memoryWait;
             }
 
             // A captured buffer may loop indefinitely while global/memory freeze is active.
@@ -289,14 +338,15 @@ public:
                     const float stereoBias = channel == 0 ? -1.0f : 1.0f;
                     const double variation = 1.0 + noise * p.mutationRandom * 0.3;
                     const double movement = 1.0 + stereoBias * p.mutationStereo
-                                            * p.mutationMotion * 0.18;
+                                            * grainMotion * 0.18;
                     voice.speed = std::clamp(grainPitch * variation * movement, 0.25, 4.0);
                 }
                 grainVoice_ = 1 - grainVoice_;
-                grainCountdown_ = grainSpacing;
+                grainCountdown_ = std::max(48,
+                    static_cast<int>(sampleRate_ / grainDensity));
             }
 
-            phase_ += phaseIncrement;
+            phase_ += basePhaseIncrement * rateMultiplier;
             if (phase_ >= static_cast<float>(twoPi)) phase_ -= static_cast<float>(twoPi);
             float pulsePosition = phase_ / static_cast<float>(twoPi);
             const float swingDivider = 0.5f + 0.23f * p.pulseSwing;
@@ -306,7 +356,7 @@ public:
 
             const float root = (p.harmonicMono && trackedRoot_ > 0.0f) ? trackedRoot_ : p.rootHz;
             const float rhythmTarget = p.pulseActive
-                ? envelope_ * (0.5f + 0.5f * std::sin(phase_)) * p.pulse : 0.0f;
+                ? envelope_ * (0.5f + 0.5f * std::sin(phase_)) * pulseDepth : 0.0f;
             rhythmicActivity_ += 0.007f * (std::clamp(rhythmTarget * 4.0f, 0.0f, 1.0f)
                                             - rhythmicActivity_);
             constexpr std::array<std::array<float, 3>, 4> harmonicIntervals {{
@@ -317,6 +367,7 @@ public:
             }};
             const auto& intervals = harmonicIntervals[static_cast<std::size_t>(p.harmonicMode)];
             float tonalInstant = 0.0f;
+            float pulseInstant = 0.0f, grainInstant = 0.0f, memoryInstant = 0.0f;
             for (int channel = 0; channel < channels; ++channel)
             {
                 const auto ch = static_cast<std::size_t>(channel);
@@ -332,22 +383,25 @@ public:
                 const float delayed = pulseBuffer_[ch][delayedPosition];
                 pulseBuffer_[ch][pulseWrite_] = std::clamp(dry[ch] + delayed
                                                  * p.pulseFeedback * 0.72f, -2.0f, 2.0f);
-                if (p.pulseActive && p.pulse > 0.0001f)
+                if (p.pulseActive && pulseDepth > 0.0001f)
                 {
                     const float stereoPhase = channel == 1
                         ? 0.20f * p.pulseWidth : 0.0f;
                     const float position = std::fmod(pulsePosition + stereoPhase, 1.0f);
                     const float wave = 0.5f - 0.5f * std::cos(static_cast<float>(twoPi) * position);
                     const float dynamic = 0.22f + 0.78f * std::clamp(envelope_ * 4.0f * (0.4f + p.pulseSensitivity * 1.3f), 0.0f, 1.0f);
-                    pulseDelta = p.pulse * p.pulseMix *
+                    pulseDelta = pulseDepth * p.pulseMix *
                         (-dry[ch] * dynamic * (1.0f - wave) + delayed * p.pulseFeedback * 0.25f);
                 }
+
+                pulseInstant += std::abs(pulseDelta);
 
                 // HARMONIC LIFE: three independently tuned, bounded resonators.
                 float harmonicDelta = 0.0f;
                 for (int voice = 0; voice < 3; ++voice)
                 {
-                    const float movement = p.harmonicMotion * std::sin(phase_ * 0.43f + voice * 1.7f);
+                    const float movement = harmonicMovement
+                        * std::sin(phase_ * 0.43f + voice * 1.7f);
                     const float frequency = std::clamp(root * intervals[static_cast<std::size_t>(voice)]
                                               * (1.0f + 0.035f * movement),
                                               45.0f, static_cast<float>(sampleRate_ * 0.42));
@@ -368,7 +422,7 @@ public:
                     ? (channel == 0 ? 1.0f - 0.12f * p.harmonicSpread
                                      : 1.0f + 0.12f * p.harmonicSpread) : 1.0f;
                 if (p.harmonicActive)
-                    harmonicDelta *= p.harmonic * p.harmonicResonance * 0.35f * stereoSpread;
+                    harmonicDelta *= p.harmonic * harmonicStrength * 0.35f * stereoSpread;
                 else
                     harmonicDelta = 0.0f;
                 tonalInstant += std::abs(harmonicDelta);
@@ -393,6 +447,7 @@ public:
                 }
                 const float mutationDelta = p.mutationActive
                     ? grainWet * p.mutation : 0.0f;
+                grainInstant += std::abs(mutationDelta);
 
                 // MEMORY: windowed fragment with reverse blend and bounded repeats.
                 float memoryDelta = 0.0f;
@@ -412,13 +467,26 @@ public:
                                               memoryLength_ - 1 - position)) % memoryCapacity_;
                     const float echo = memoryBuffer_[ch][forward] * (1.0f - p.memoryReverse)
                                      + memoryBuffer_[ch][backward] * p.memoryReverse;
-                    const float gain = std::pow(p.memoryFeedback,
+                    const float gain = std::pow(memoryFeedback,
                         static_cast<float>(repetition % 3));
-                    memoryDelta = echo * window * gain * p.memory * p.memoryRecall;
+                    memoryDelta = echo * window * gain * p.memory * memoryRecall;
                 }
 
+                memoryInstant += std::abs(memoryDelta);
                 delta[ch] = pulseDelta + harmonicDelta + mutationDelta + memoryDelta;
             }
+
+            // Real engine-to-engine meters, normalized before the next
+            // sample is evaluated by the REACTION matrix.
+            const float invChannels = 1.0f / static_cast<float>(channels);
+            pulseSource_ += 0.015f * (std::clamp(pulseInstant * invChannels * 12.0f,
+                                                0.0f, 1.0f) - pulseSource_);
+            harmonicSource_ += 0.015f * (std::clamp(tonalInstant * invChannels * 18.0f,
+                                                   0.0f, 1.0f) - harmonicSource_);
+            grainSource_ += 0.015f * (std::clamp(grainInstant * invChannels * 9.0f,
+                                                0.0f, 1.0f) - grainSource_);
+            memorySource_ += 0.015f * (std::clamp(memoryInstant * invChannels * 8.0f,
+                                                 0.0f, 1.0f) - memorySource_);
 
             if (shouldRecall)
             {
@@ -549,6 +617,10 @@ private:
     bool memoryHasCapture_ = false, smoothed_ = false;
     float phase_ = 0.0f, envelope_ = 0.0f;
     float attackActivity_ = 0.0f, rhythmicActivity_ = 0.0f;
+    float pulseSource_ = 0.0f, harmonicSource_ = 0.0f;
+    float grainSource_ = 0.0f, memorySource_ = 0.0f;
+    float previousMemoryExcitation_ = 0.0f;
+    ReactionMatrix reactionMatrix_;
     float memoryActivity_ = 0.0f, tonalEnergy_ = 0.0f;
     float smoothedInput_ = 1.0f, smoothedOutput_ = 1.0f, smoothedMix_ = 0.65f;
     float smoothedWidth_ = 0.8f, smoothedIntensity_ = 0.5f, wetBypass_ = 1.0f;

@@ -1,6 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include <atomic>
+#include <array>
 #include "Ui/EngineNavigation.h"
 #include "Dsp/BiosphereDSP.h"
 
@@ -65,6 +66,18 @@ public:
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout makeParameterLayout();
+
+    struct ReactionParameterHandles
+    {
+        std::atomic<float>* active = nullptr;
+        std::atomic<float>* source = nullptr;
+        std::atomic<float>* destination = nullptr;
+        std::atomic<float>* amount = nullptr;
+    };
+
+    // Resolve the 32 route ID lookups once in the constructor, never while
+    // processing an audio block (no dynamic JUCE String creation in callback).
+    std::array<ReactionParameterHandles, 8> reactionHandles_ {};
     biosphere::BiosphereDSP dsp_;
     std::atomic<int> selectedEditorPage_ { biosphere::ui::EngineNavigationState::defaultPage };
     std::atomic<bool> english_ { false };

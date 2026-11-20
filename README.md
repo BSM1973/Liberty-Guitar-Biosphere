@@ -3,7 +3,7 @@
 
 Native C++20 / JUCE 8 guitar audio-effect plugin for macOS (AU / VST3) and Windows (VST3).
 
-## Development status — Phase 5
+## Development status — Phase 6
 
 This is an **early functional DSP foundation**, not a finished commercial product.
 
@@ -32,7 +32,11 @@ Implemented:
 - MEMORY: recall duration, capture sensitivity, repeat rate, reverse blend, feedback, fade, freeze, independent mix and enable.
 - Four live performance macros (GROWTH, MOTION, SPACE, ENERGY) change multiple engine parameters without overwriting stored APVTS values.
 - Master bus: smoothed input/output gain, dry/wet, intensity, speed, processed stereo width, host BPM sync, global memory freeze and smooth raw bypass.
-- REACTION route controls are editable and saved as parameters; its modulation DSP remains pending.
+- **REACTION DSP is now connected**: 8 independently smoothed, host-automatable bipolar routes link real PULSE, HARMONIC LIFE, MUTATION and MEMORY audio activity to 8 modulation destinations.
+- All 6 REACTION global controls (including on/off) and all 32 route controls are read from APVTS; no route-ID strings are allocated on the audio thread.
+- Routes map to live grain density, PULSE depth, harmonic movement/resonance, MEMORY recall/feedback, grain movement and PULSE rate.
+- A rising harmonic-to-MEMORY recall route can retrigger a recorded fragment, respecting the memory cooldown and freeze switches.
+- Factory starter patch 20 now demonstrates the attack → PULSE → harmonic → MEMORY cascade; the factory starter count remains 20.
 - **Shared analysis is live:** input/output peaks, envelope, attack activity, pulse/rhythm activity, MEMORY playback, measured harmonic output activity and a conservative monophonic root estimate.
 - Audio publishes analysis into atomic values, and the JUCE UI polls at 30 Hz (no UI work in the audio callback).
 - **Functional preset browser:** category/search/favorites, 20 usable factory starter patches, previous/next, user XML save/load, two-step delete confirmation, and user-specific favorite persistence.
@@ -40,12 +44,40 @@ Implemented:
 - Standalone, JUCE-free DSP smoke tests, and cross-platform GitHub Actions builds.
 
 Not yet implemented:
-- REACTION matrix and EVOLUTION ecosystem controller.
+- EVOLUTION ecosystem controller (its route source is deliberately silent until implemented).
 - The complete set of 100 individually designed, auditioned and loudness-balanced factory presets (20 starter patches exist, not claimed as finalized).
 - Final listening QA, nuanced translation QA and any remaining design refinements after in-DAW testing.
 - Production-level audio validation and signed/notarized installers.
 
 No feature listed above as pending is represented as complete in the UI.
+
+## REACTION — phase 6
+
+The 8 existing routes are now connected to actual DSP signal sources. Source
+index values (existing preset format) are kept stable:
+0 attack; 1 envelope; 2 PULSE; 3 HARMONIC LIFE; 4 MUTATION; 5 MEMORY;
+6 EVOLUTION (zero until the EVOLUTION engine is ready); 7 silence.
+
+The 8 destinations retain the same stable index order:
+0 grain density; 1 PULSE depth; 2 harmonic movement; 3 MEMORY recall;
+4 harmonic resonance; 5 grain movement; 6 MEMORY feedback; 7 PULSE cadence.
+
+Each route has on/off, source, destination and amount from -100% to +100%.
+The six global controls affect enable, reactivity, interaction depth,
+sensitivity, response time and complexity. Modulation is bounded; per-route
+and per-destination smoothing avoid discontinuities during live automation
+and reassignment. Sources from engines use the previous completed sample,
+preventing algebraic feedback cycles. All buffers and routing state are
+preallocated; no UI interaction, mutex or new objects in the sample callback.
+
+A harmonic-to-MEMORY recall route can start a stored fragment from a
+musical excitation, with cooldown protection. Memory's original
+attack-triggered recording remains functional.
+
+To audition a complete chain, select preset **20 - The Living Guitar**:
+ATTACK → PULSE depth → HARMONIC movement → MEMORY recall. The other 5
+routes are disabled in that example, and can be edited in REACTION.
+This adds **no new APVTS IDs** and does not overwrite legacy presets.
 
 ## Analysis, preset browser and languages — phase 5
 
@@ -74,9 +106,9 @@ Future releases still need an in-host visual review and listening QA.
 
 ## DSP, macros and master bus — phase 4
 
-The existing four DSP engines have **real mappings** from APVTS parameters. Only these four
-produce audio today. REACTION and EVOLUTION retain automated/stored settings but their
-modulation/state engines still require implementation; they do not yet change sound.
+The four sound-producing DSP engines have **real mappings** from APVTS parameters.
+REACTION now interconnects those engines through a real-time modulation matrix and
+also responds to attacks, amplitude envelope, and silence. EVOLUTION remains reserved.
 
 DSP mappings:
 
@@ -155,7 +187,7 @@ Guitar In -> Shared envelope/onset analysis
           +-> MEMORY (transient-triggered ghost slices)
           -> Wet mixer + Dry / Wet -> Output protection -> Guitar Out
 
-REACTION and EVOLUTION: planned modulation/control layers, not yet connected.
+REACTION: working 8-route bipolar inter-engine modulation; EVOLUTION: reserved and silent.
 ```
 
 Source: `Source/Dsp/BiosphereDSP.h` is independent of JUCE, enabling deterministic tests of the actual sample processing algorithm.
@@ -163,7 +195,7 @@ Source: `Source/Dsp/BiosphereDSP.h` is independent of JUCE, enabling determinist
 ## Next milestones
 
 1. Check Phase-5 AU/VST3 artifacts and visually validate the exact 13-inch editor in DAWs.
-2. Complete the REACTION modulation routes and four-state EVOLUTION audio controllers.
+2. Develop the four-state EVOLUTION audio controller and its modulation source.
 3. Design, audition and balance all 100 final factory presets.
 4. Verify bilingual presentation and UI spacing in real hosts; finish stability/CPU tests.
 5. Apple Developer ID signing, notarization and Windows release preparation.
