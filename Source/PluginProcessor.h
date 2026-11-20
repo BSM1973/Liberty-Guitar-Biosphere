@@ -99,7 +99,7 @@ private:
     std::array<ReactionParameterHandles, 8> reactionHandles_ {};
     biosphere::BiosphereDSP dsp_;
     biosphere::midi::LearnRouter midiRouter_;
-    std::array<juce::RangedAudioParameter*, biosphere::midi::LearnRouter::maximumParameters> midiParameters_ {};
+    std::array<juce::AudioProcessorParameter*, biosphere::midi::LearnRouter::maximumParameters> midiParameters_ {};
     std::array<juce::String, biosphere::midi::LearnRouter::maximumParameters> midiParameterIds_ {};
     int midiParameterCount_ = 0;
     std::atomic<int> selectedEditorPage_ { biosphere::ui::EngineNavigationState::defaultPage };
