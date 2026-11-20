@@ -65,6 +65,7 @@ public:
         cancel();
         for (auto& a : assignments_) a.store(-1, std::memory_order_release);
         for (auto& p : pending_) p.store(-1, std::memory_order_release);
+        lastLearn_.store(-1, std::memory_order_release);
     }
     int assignment(int index) const noexcept
     {
