@@ -19,6 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Audit fail-closed commercial release gate and shell scripts
+        run: |
+          python3 tools/check_premium_gate.py --schema-only
+          bash -n tools/macos_sign_notarize.sh
       - name: Build DSP test without JUCE
         run: c++ -std=c++20 -O2 -Wall -Wextra -Werror -ISource Tests/DspSmoke.cpp -o biosphere-dsp-tests
       - name: Run DSP test
@@ -120,6 +124,15 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
+      - name: Parse Windows commercial signing script (no secrets)
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path (Get-Location) 'tools/windows_sign.ps1'),
+            [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { throw ($errors | Out-String) }
       - name: Configure
         run: cmake -S . -B build -A x64 -DBUILD_TESTING=ON
       - name: Build
