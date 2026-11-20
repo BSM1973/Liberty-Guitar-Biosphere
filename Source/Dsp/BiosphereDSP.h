@@ -256,6 +256,12 @@ public:
             1.0 - std::exp(-1.0 / (sampleRate_ * 0.014)));
         const float engineGateSmooth = static_cast<float>(
             1.0 - std::exp(-1.0 / (sampleRate_ * 0.023)));
+        // Block-invariant resonator coefficients: avoid re-evaluating their
+        // ranges and scaling inside six voice/channel inner loops.
+        const double harmonicDecayScale = std::clamp(
+            static_cast<double>(p.harmonicDecay), 0.1, 9.0);
+        const double harmonicDamp = 0.65 + (1.0 - p.harmonicDamping) * 0.85;
+        const float harmonicToneMix = 0.14f + 0.42f * (1.0f - p.harmonicDamping);
 
         for (int sample = 0; sample < samples; ++sample)
         {
@@ -492,6 +498,13 @@ public:
             const auto& intervals = p.harmonicMono
                 ? musicalIntervals[static_cast<std::size_t>(p.harmonicMode)]
                 : fixedIntervals[static_cast<std::size_t>(p.harmonicMode)];
+            // Both stereo channels share the same harmonic modulation phase.
+            // Calculate three trigonometric LFOs once per sample, not twice.
+            const std::array<float, 3> harmonicLfo {
+                std::sin(phase_ * 0.43f),
+                std::sin(phase_ * 0.43f + 1.7f),
+                std::sin(phase_ * 0.43f + 3.4f)
+            };
             float tonalInstant = 0.0f;
             float pulseInstant = 0.0f, grainInstant = 0.0f, memoryInstant = 0.0f;
             for (int channel = 0; channel < channels; ++channel)
@@ -532,12 +545,15 @@ public:
                 pulseDelta *= engineGate_[0];
                 pulseInstant += std::abs(pulseDelta);
 
-                // HARMONIC LIFE: three independently tuned, bounded resonators.
+                // HARMONIC LIFE: compute non-linear excitation once per
+                // channel rather than three times for each resonator.
+                const double harmonicExcitation =
+                    std::tanh(dry[ch] * 1.50f) * 0.78;
                 float harmonicDelta = 0.0f;
                 for (int voice = 0; voice < 3; ++voice)
                 {
                     const float movement = harmonicMovement
-                        * std::sin(phase_ * 0.43f + voice * 1.7f);
+                        * harmonicLfo[static_cast<std::size_t>(voice)];
                     const float targetFrequency = std::clamp(
                         root * intervals[static_cast<std::size_t>(voice)]
                             * (1.0f + 0.035f * movement),
@@ -549,22 +565,17 @@ public:
                         state.frequency = targetFrequency;
                     state.frequency += harmonicTuneSmoothing
                                        * (targetFrequency - state.frequency);
-                    const double decayScale = std::clamp(
-                        static_cast<double>(p.harmonicDecay), 0.1, 9.0);
-                    const double damp = 0.65 + (1.0 - p.harmonicDamping) * 0.85;
-                    const double radius = std::exp(-state.frequency * damp
-                                                       / (12.0 * sampleRate_ * decayScale));
+                    const double radius = std::exp(-state.frequency * harmonicDamp
+                                        / (12.0 * sampleRate_ * harmonicDecayScale));
                     const double angle = twoPi * state.frequency / sampleRate_;
-                    const double excitation = std::tanh(dry[ch] * 1.50f) * 0.78;
-                    const double next = (1.0 - radius) * excitation
+                    const double next = (1.0 - radius) * harmonicExcitation
                         + 2.0 * radius * std::cos(angle) * state.last
                         - radius * radius * state.previous;
                     state.previous = state.last;
                     state.last = std::clamp(next, -5.0, 5.0);
                     // Damp upper harmonics of the resonator output without
                     // suppressing note tracking or smoothing the master dry.
-                    const float dampingMix = 0.14f + 0.42f * (1.0f - p.harmonicDamping);
-                    state.tone += dampingMix * (static_cast<float>(
+                    state.tone += harmonicToneMix * (static_cast<float>(
                         std::tanh(state.last * 0.85)) - state.tone);
                     harmonicDelta += state.tone;
                 }
