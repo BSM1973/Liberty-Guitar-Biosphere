@@ -93,7 +93,7 @@ juce_add_plugin(GuitarBiosphere
     PLUGIN_CODE GBio
     PRODUCT_NAME "Guitar Biosphere"
     IS_SYNTH FALSE
-    NEEDS_MIDI_INPUT FALSE
+    NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
@@ -128,6 +128,7 @@ target_sources(GuitarBiosphere PRIVATE
     Source/Dsp/EvolutionEngine.h
     Source/Dsp/GuitarPitchTracker.h
     Source/Dsp/BiosphereDSP.h
+    Source/Midi/MidiLearnRouter.h
 )
 
 if(MSVC)
