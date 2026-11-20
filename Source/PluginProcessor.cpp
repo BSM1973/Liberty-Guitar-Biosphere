@@ -126,8 +126,25 @@ void GuitarBiosphereAudioProcessor::processBlock(juce::AudioBuffer<float>& buffe
                     p.hostBpm = static_cast<float>(*bpm);
                 }
 
-    // REACTION/EVO parameters are stored by APVTS, but no corresponding
-    // modulation DSP exists yet. Do not pretend they affect audio.
+    // REACTION: real eight-route APVTS -> DSP matrix. The choice indices
+    // remain byte-for-byte compatible with existing factory/user sessions.
+    p.reaction.active = enabled("react.active");
+    p.reaction.reactivity = value("react.reactivity");
+    p.reaction.interaction = value("react.interaction");
+    p.reaction.sensitivity = value("react.sensitivity");
+    p.reaction.responseMs = value("react.response");
+    p.reaction.complexity = value("react.complexity");
+    for (int index = 0; index < 8; ++index)
+    {
+        const juce::String prefix = "react.route" + juce::String(index + 1);
+        auto& route = p.reaction.routes[static_cast<std::size_t>(index)];
+        route.active = value((prefix + ".active").toRawUTF8()) >= 0.5f;
+        route.source = static_cast<int>(value((prefix + ".source").toRawUTF8()));
+        route.destination = static_cast<int>(value((prefix + ".destination").toRawUTF8()));
+        route.amount = value((prefix + ".amount").toRawUTF8());
+    }
+
+    // EVOLUTION is not implemented yet. Its route source is deliberately 0.
     float* audio[2] = { buffer.getWritePointer(0), channels > 1 ? buffer.getWritePointer(1) : nullptr };
     dsp_.process(audio, channels, samples, p);
 
