@@ -169,8 +169,8 @@ int main()
         for (std::size_t i = 0; i < patches.size(); ++i)
         {
             const auto& patch = patches[i];
-            char prefix[4] {};
-            std::snprintf(prefix, sizeof(prefix), "%02zu", i + 1);
+            const std::string prefix =
+                (i < 9 ? "0" : "") + std::to_string(i + 1);
             need(patch.name.rfind(prefix, 0) == 0, "Factory numbering/order is not stable");
             need(names.insert(patch.name).second, patch.name + ": duplicate preset name");
             ++categories[patch.category];
