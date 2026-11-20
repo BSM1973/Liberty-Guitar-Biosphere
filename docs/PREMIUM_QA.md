@@ -16,6 +16,19 @@ until the actual DAW checks have been performed and documented.
 - Store pluginval JUnit reports and record SHA256 hashes of delivered artifacts
 - Never equate these automated API checks with a real Logic/Ableton/Reaper GUI session
 
+## MIDI Learn and installer acceptance — NOT RUN
+
+- [ ] Connect a physical MIDI controller to Logic AU and Ableton VST3, right
+  click a HARMONIC LIFE knob, learn CC on its real MIDI channel, verify UI
+  movement, recorded host automation, A/B independence and project restore
+- [ ] Repeat MIDI learn on a macro, master bypass, REACTION route and EVOLUTION
+  control; remove assignment, clear all and verify mapping independence from
+  factory presets and user XML
+- [ ] Install unsigned macOS AU+VST3 technical QA .pkg on a separate test Mac,
+  restart the DAW, verify formats and uninstall/upgrade behavior
+- [ ] Install unsigned Windows VST3 test EXE, verify both French and English
+  installer languages, correct VST3 folder, repair/update and uninstall
+
 ## Manual host acceptance — ALL must be checked
 
 | Host | Format | Steps | Status |
