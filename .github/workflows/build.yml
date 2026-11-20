@@ -27,6 +27,10 @@ jobs:
         run: c++ -std=c++20 -O2 -Wall -Wextra -Werror -ISource Tests/DspSmoke.cpp -o biosphere-dsp-tests
       - name: Run DSP test
         run: ./biosphere-dsp-tests
+      - name: Test MIDI Learn CC mapping, cancellation and no audio-thread allocations
+        run: |
+          c++ -std=c++20 -O2 -Wall -Wextra -Werror -ISource Tests/MidiLearnSmoke.cpp -o biosphere-midi-learn-tests
+          ./biosphere-midi-learn-tests
       - name: Stress malformed host buffers, automation and zero allocations
         run: |
           c++ -std=c++20 -O2 -Wall -Wextra -Werror -ISource Tests/PremiumStability.cpp -o biosphere-premium-stress
@@ -130,6 +134,18 @@ jobs:
             build/GuitarBiosphere_artefacts/Release/AU/
             build/GuitarBiosphere_artefacts/Release/VST3/
           if-no-files-found: error
+      - name: Create unsigned macOS test installer (AU + VST3)
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(python3 -c 'import re,pathlib; print(re.search(r"project\(LibertyGuitarBiosphere VERSION (\d+\.\d+\.\d+)", pathlib.Path("CMakeLists.txt").read_text()).group(1))')"
+          bash tools/macos_package_test.sh "$version"
+      - name: Upload unsigned macOS test PKG
+        uses: actions/upload-artifact@v4
+        with:
+          name: Guitar-Biosphere-macOS-ARM64-UNSIGNED-TEST-PKG
+          path: release-output/*-UNSIGNED-TEST.pkg
+          if-no-files-found: error
 
   windows:
     name: Windows x64 (VST3)
@@ -143,6 +159,10 @@ jobs:
           $errors = $null
           [System.Management.Automation.Language.Parser]::ParseFile(
             (Join-Path (Get-Location) 'tools/windows_sign.ps1'),
+            [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { throw ($errors | Out-String) }
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path (Get-Location) 'tools/windows_installer.ps1'),
             [ref]$tokens, [ref]$errors) | Out-Null
           if ($errors.Count -gt 0) { throw ($errors | Out-String) }
       - name: Configure
@@ -172,4 +192,27 @@ jobs:
         with:
           name: Guitar-Biosphere-Windows-x64-unsigned
           path: build/GuitarBiosphere_artefacts/Release/VST3/
+          if-no-files-found: error
+      - name: Ensure Inno Setup 6 exists for Windows installer
+        shell: pwsh
+        run: |
+          $iscc = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Inno Setup 6\ISCC.exe'
+          if (!(Test-Path -LiteralPath $iscc)) {
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed' }
+          }
+          if (!(Test-Path -LiteralPath $iscc)) { throw 'ISCC.exe missing' }
+      - name: Create unsigned Windows x64 VST3 test installer
+        shell: pwsh
+        run: |
+          $project = Get-Content CMakeLists.txt -Raw
+          $version = [regex]::Match($project, 'project\(LibertyGuitarBiosphere VERSION (\d+\.\d+\.\d+)').Groups[1].Value
+          if (!$version) { throw 'CMake version missing' }
+          pwsh -NoProfile -File tools/windows_installer.ps1 -Version $version
+          if ($LASTEXITCODE -ne 0) { throw 'Windows installer creation failed' }
+      - name: Upload unsigned Windows test Setup.exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: Guitar-Biosphere-Windows-x64-UNSIGNED-TEST-SETUP
+          path: release-output/*-UNSIGNED-TEST-Setup.exe
           if-no-files-found: error
