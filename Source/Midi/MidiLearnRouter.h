@@ -69,7 +69,7 @@ public:
         {
             assignments_[static_cast<std::size_t>(learn)].store(code, std::memory_order_release);
             // Last learned target recorded for status in editor.
-            lastLearn_.store((learn << 11) | code, std::memory_order_release);
+            lastLearn_.store((learn << 12) | code, std::memory_order_release);
         }
 
         for (std::size_t i = 0; i < assignments_.size(); ++i)
@@ -86,8 +86,8 @@ public:
     {
         return lastLearn_.exchange(-1, std::memory_order_acq_rel);
     }
-    static constexpr int learnedIndex(int notification) noexcept { return notification >> 11; }
-    static constexpr int learnedBinding(int notification) noexcept { return notification & 2047; }
+    static constexpr int learnedIndex(int notification) noexcept { return notification >> 12; }
+    static constexpr int learnedBinding(int notification) noexcept { return notification & 4095; }
 
 private:
     static constexpr bool valid(int index) noexcept
