@@ -19,6 +19,11 @@ if(BUILD_TESTING)
     target_compile_features(BiosphereDspRoutingTests PRIVATE cxx_std_20)
     add_test(NAME BiosphereDspRoutingTests COMMAND BiosphereDspRoutingTests)
 
+    add_executable(BiosphereSoundEnginesProTests Tests/SoundEnginesPro.cpp)
+    target_include_directories(BiosphereSoundEnginesProTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
+    target_compile_features(BiosphereSoundEnginesProTests PRIVATE cxx_std_20)
+    add_test(NAME BiosphereSoundEnginesProTests COMMAND BiosphereSoundEnginesProTests)
+
     add_executable(BiosphereGuitarIntelligenceTests Tests/GuitarIntelligence.cpp)
     target_include_directories(BiosphereGuitarIntelligenceTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
     target_compile_features(BiosphereGuitarIntelligenceTests PRIVATE cxx_std_20)
