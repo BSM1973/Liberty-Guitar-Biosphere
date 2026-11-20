@@ -43,6 +43,6 @@ private:
     juce::ComboBox category_;
     juce::ListBox list_;
     juce::TextButton close_ { "X" }, load_ { "Charger" }, save_ { "Enregistrer" },
-        favorite_ { "☆" }, remove_ { "Supprimer" };
+        favorite_ { "F" }, remove_ { "Supprimer" };
 };
 } // namespace biosphere::ui
