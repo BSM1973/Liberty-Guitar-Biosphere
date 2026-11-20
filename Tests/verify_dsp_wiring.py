@@ -75,5 +75,6 @@ assert "zeroCrossCounter_" not in dsp
 for key in ("pitchConfidence", "midiNote"):
     assert f"analysis.{key}.store(" in processor
     assert f"m.{key}.load(" in editor
-    assert f"metrics_.{key}" in panel
+assert "metrics_.confidence" in panel
+assert "metrics_.midiNote" in panel
 print(f"DSP wiring audit PASS: {len(expected)} base APVTS controls + GUITAR INTELLIGENCE")
