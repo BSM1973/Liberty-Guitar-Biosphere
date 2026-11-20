@@ -1,0 +1,17 @@
+{
+  "version": "0.5.0",
+  "approved": false,
+  "manual_qa": {
+    "logic_pro_mac_au": false,
+    "ableton_live_mac_vst3": false,
+    "reaper_windows_vst3": false,
+    "preset_100_listening_and_balance": false,
+    "ab_undo_redo_project_reopen": false,
+    "screen_13inch_fr_en_no_overlap": false
+  },
+  "evidence": {
+    "notes": "PENDING: no manual DAW listening/host validation report has been supplied; do not approve or sign a commercial release.",
+    "approved_by": "",
+    "approved_at": ""
+  }
+}
