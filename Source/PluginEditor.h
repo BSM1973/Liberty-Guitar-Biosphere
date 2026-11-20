@@ -71,6 +71,7 @@ private:
     juce::TextButton undo_ { "ANNULER" }, redo_ { "REFAIRE" };
     juce::TextButton french_ { "FR" }, english_ { "EN" };
     juce::Label midiLearnStatus_;
+    int lastLearnBinding_ = -1; // UI-only success feedback, no new audio parameter
     juce::TextButton sync_ { "Synchro hote" }, freeze_ { "Gel global" },
                      bypass_ { "Bypass global" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> syncAttachment_;
