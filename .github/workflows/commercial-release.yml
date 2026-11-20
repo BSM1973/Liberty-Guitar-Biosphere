@@ -1,0 +1,225 @@
+name: GUITAR BIOSPHERE — Commercial signed releases
+run-name: Signed AU/VST3 commercial candidates from main
+
+# Deliberately manual on protected main. PRs NEVER receive signing secrets.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Plugin version X.Y.Z (must match CMake version)
+        required: true
+        type: string
+        default: '0.5.0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: guitar-biosphere-commercial
+  cancel-in-progress: false
+
+jobs:
+  apple-commercial:
+    if: github.ref == 'refs/heads/main'
+    name: Mac Developer ID + Apple notarization + signed installer
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require documented manual DAW/listening/UI approval
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: python3 tools/check_premium_gate.py "$RELEASE_VERSION"
+      - name: Verify version, Apple secrets and shell syntax before build
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          APP_P12: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_P12_BASE64 }}
+          INSTALL_P12: ${{ secrets.APPLE_DEVELOPER_ID_INSTALLER_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.APPLE_P12_PASSWORD }}
+          NOTARY_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_APP_PASSWORD }}
+          NOTARY_TEAM: ${{ secrets.APPLE_NOTARY_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          bash -n tools/macos_sign_notarize.sh
+          python3 - <<'PY'
+          import os, re, pathlib
+          actual = re.search(r'project\(LibertyGuitarBiosphere VERSION (\d+\.\d+\.\d+)', pathlib.Path('CMakeLists.txt').read_text()).group(1)
+          assert actual == os.environ['RELEASE_VERSION'], 'Package version must exactly match plugin version'
+          PY
+          for key in APP_P12 INSTALL_P12 P12_PASSWORD NOTARY_ID NOTARY_PASSWORD NOTARY_TEAM; do
+            test -n "$(printenv "$key")" || { echo "::error::Missing Apple release secret: $key"; exit 1; }
+          done
+      - name: Build release AU/VST3, unit tests and static UI checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DBUILD_TESTING=ON
+          cmake --build build --config Release --parallel 3
+          ctest --test-dir build -C Release --output-on-failure
+          python3 Tests/verify_utf8.py
+          python3 Tests/verify_phase10.py
+      - name: Register and test real AU with Apple auval
+        shell: bash
+        run: |
+          set -euo pipefail
+          built="build/GuitarBiosphere_artefacts/Release/AU/Guitar Biosphere.component"
+          target="$HOME/Library/Audio/Plug-Ins/Components/Guitar Biosphere.component"
+          mkdir -p "$(dirname "$target")"
+          /usr/bin/ditto "$built" "$target"
+          # JUCE's ad-hoc bundle signature may be stale after copying:
+          # re-sign the complete AU bundle in the disposable QA account.
+          /usr/bin/codesign --force --deep --sign - "$target"
+          /usr/bin/codesign --verify --deep --strict --verbose=2 "$target"
+          killall -9 AudioComponentRegistrar >/dev/null 2>&1 || true
+          sleep 4
+          /usr/bin/auval -a
+          /usr/bin/auval -v aumf GBio Lbms
+      - name: Host validation — macOS VST3 via pluginval
+        uses: Tracktion/pluginval/validate@286684f72062250fd2494681b7ebdcb721f09e0d
+        with:
+          pluginval-version: v2.0.0-beta3
+          plugins: |
+            build/GuitarBiosphere_artefacts/Release/VST3/*.vst3
+          strictness-level: '5'
+          args: '--skip-gui-tests --timeout-ms 120000'
+      - name: Developer ID sign, Apple notary Accepted, staple and Gatekeeper
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          APPLE_DEVELOPER_ID_APPLICATION_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_P12_BASE64 }}
+          APPLE_DEVELOPER_ID_INSTALLER_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_INSTALLER_P12_BASE64 }}
+          APPLE_P12_PASSWORD: ${{ secrets.APPLE_P12_PASSWORD }}
+          APPLE_NOTARY_APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
+          APPLE_NOTARY_APP_PASSWORD: ${{ secrets.APPLE_NOTARY_APP_PASSWORD }}
+          APPLE_NOTARY_TEAM_ID: ${{ secrets.APPLE_NOTARY_TEAM_ID }}
+        run: bash tools/macos_sign_notarize.sh "$RELEASE_VERSION"
+      - name: Publish only the accepted signed macOS installer
+        id: publish
+        uses: actions/upload-artifact@v4
+        with:
+          name: Guitar-Biosphere-macOS-SIGNED-NOTARIZED-PKG
+          path: release-output/*.pkg
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 90
+      - name: Re-download the exact published installer
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ steps.publish.outputs.artifact-id }}
+          path: verified-apple
+          merge-multiple: true
+      - name: Final verification of downloadable Apple installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkg="$(find verified-apple -type f -name '*.pkg' -print -quit)"
+          test -n "$pkg" && test -s "$pkg"
+          /usr/sbin/pkgutil --check-signature "$pkg"
+          /usr/bin/xcrun stapler validate "$pkg"
+          /usr/sbin/spctl --assess --type install --verbose=2 "$pkg"
+          echo "Apple signed and notarized downloadable pkg: $(shasum -a 256 "$pkg")" >> "$GITHUB_STEP_SUMMARY"
+      - name: Apple validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Guitar-Biosphere-Apple-release-validation
+          path: release-validation/
+          if-no-files-found: ignore
+
+  windows-commercial:
+    if: github.ref == 'refs/heads/main'
+    name: Windows x64 Authenticode signed VST3
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require documented manual DAW/listening/UI approval
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          python tools/check_premium_gate.py "$env:RELEASE_VERSION"
+          if ($LASTEXITCODE -ne 0) { throw 'Manual premium QA approval missing' }
+      - name: Verify version and PFX credentials before build
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          WINDOWS_SIGNING_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
+          WINDOWS_SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+        run: |
+          $project = Get-Content CMakeLists.txt -Raw
+          $match = [regex]::Match($project, 'project\(LibertyGuitarBiosphere VERSION (\d+\.\d+\.\d+)')
+          if (!$match.Success -or $match.Groups[1].Value -ne $env:RELEASE_VERSION) { throw 'Signed package version mismatch' }
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_PFX_BASE64) -or [string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_PFX_PASSWORD)) {
+            throw 'Windows code-signing secrets missing: NO signed release'
+          }
+      - name: Build, unit tests, UI audits
+        shell: pwsh
+        run: |
+          cmake -S . -B build -A x64 -DBUILD_TESTING=ON
+          if ($LASTEXITCODE -ne 0) { throw 'CMake configure failed' }
+          cmake --build build --config Release --parallel 3
+          if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
+          ctest --test-dir build -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw 'Native tests failed' }
+          python Tests/verify_utf8.py
+          if ($LASTEXITCODE -ne 0) { throw 'UTF-8 audit failed' }
+      - name: Host validation — Windows VST3
+        uses: Tracktion/pluginval/validate@286684f72062250fd2494681b7ebdcb721f09e0d
+        with:
+          pluginval-version: v2.0.0-beta3
+          plugins: |
+            build/GuitarBiosphere_artefacts/Release/VST3/*.vst3
+          strictness-level: '5'
+          args: '--skip-gui-tests --timeout-ms 120000'
+      - name: Ensure Inno Setup 6 for the signed commercial installer
+        shell: pwsh
+        run: |
+          $compiler = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Inno Setup 6/ISCC.exe'
+          if (!(Test-Path -LiteralPath $compiler) -and !(Get-Command ISCC.exe -ErrorAction SilentlyContinue)) {
+            choco install innosetup -y --no-progress --limit-output
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed' }
+          }
+      - name: Authenticode sign VST3 and installable EXE
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          WINDOWS_SIGNING_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
+          WINDOWS_SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+        run: |
+          pwsh -NoProfile -File tools/windows_sign.ps1 "$env:RELEASE_VERSION"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows signing pipeline failed' }
+      - name: Publish signed Windows installer only
+        id: publish
+        uses: actions/upload-artifact@v4
+        with:
+          name: Guitar-Biosphere-Windows-x64-AUTHENTICODE-SIGNED-EXE
+          path: release-output/*.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 90
+      - name: Re-download published Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ steps.publish.outputs.artifact-id }}
+          path: verified-windows
+          merge-multiple: true
+      - name: Check exact signed Windows installer EXE after publishing
+        shell: pwsh
+        run: |
+          $source = @(Get-ChildItem release-output -Filter '*.exe' -File)
+          $downloaded = @(Get-ChildItem verified-windows -Filter '*.exe' -File)
+          if ($source.Count -ne 1 -or $downloaded.Count -ne 1) { throw 'Missing/extra EXE artifacts' }
+          $a = (Get-FileHash $source[0].FullName -Algorithm SHA256).Hash
+          $b = (Get-FileHash $downloaded[0].FullName -Algorithm SHA256).Hash
+          if ($a -ne $b) { throw 'Windows EXE hash changed during artifact publishing' }
+          $signature = Get-AuthenticodeSignature -LiteralPath $downloaded[0].FullName
+          if ($signature.Status -ne 'Valid') { throw "Published EXE signature is not trusted: $($signature.Status)" }
+          "Windows signed installer EXE published SHA256: $a" | Out-File -Append $env:GITHUB_STEP_SUMMARY

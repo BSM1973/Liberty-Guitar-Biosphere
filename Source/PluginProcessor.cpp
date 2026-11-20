@@ -30,6 +30,22 @@ GuitarBiosphereAudioProcessor::GuitarBiosphereAudioProcessor()
         handles.amount = parameters.getRawParameterValue(routeIds[i][3]);
         jassert(handles.active && handles.source && handles.destination && handles.amount);
     }
+
+    // Resolve the 97 stable host-parameter pointers at construction time.
+    // The audio callback never builds juce::Strings or touches host setters.
+    for (auto* parameter : getParameters())
+        if (auto* identified = dynamic_cast<juce::AudioProcessorParameterWithID*>(parameter))
+            if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*>(parameter))
+            {
+                if (midiParameterCount_ >= biosphere::midi::LearnRouter::maximumParameters)
+                    break;
+                midiParameterIds_[static_cast<std::size_t>(midiParameterCount_)] =
+                    identified->getParameterID();
+                midiParameters_[static_cast<std::size_t>(midiParameterCount_)] = ranged;
+                ++midiParameterCount_;
+            }
+    jassert(midiParameterCount_ == 97);
+    startTimerHz(60);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout
@@ -56,9 +72,21 @@ void GuitarBiosphereAudioProcessor::releaseResources()
     dsp_.reset();
 }
 
-void GuitarBiosphereAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+void GuitarBiosphereAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
+    // Capture MIDI CC in the audio callback WITHOUT setting APVTS parameters
+    // from the real-time thread. The 60 Hz processor timer commits values
+    // on the JUCE message thread, even when the editor is closed.
+    for (const auto metadata : midiMessages)
+    {
+        // Inspect the three MIDI bytes directly: copying long SysEx messages
+        // via getMessage() could allocate in the audio thread.
+        if (metadata.numBytes == 3
+            && (metadata.data[0] & 0xF0u) == 0xB0u)
+            midiRouter_.receive((metadata.data[0] & 0x0Fu) + 1,
+                                metadata.data[1], metadata.data[2]);
+    }
     const int channels = getTotalNumInputChannels();
     const int samples = buffer.getNumSamples();
     for (int channel = channels; channel < buffer.getNumChannels(); ++channel)
@@ -198,9 +226,70 @@ void GuitarBiosphereAudioProcessor::processBlock(juce::AudioBuffer<float>& buffe
     analysis.outputPeak.store(outputPeak, std::memory_order_relaxed);
 }
 
+int GuitarBiosphereAudioProcessor::midiParameterIndex(const juce::String& id) const
+{
+    for (int i = 0; i < midiParameterCount_; ++i)
+        if (midiParameterIds_[static_cast<std::size_t>(i)] == id)
+            return i;
+    return -1;
+}
+
+void GuitarBiosphereAudioProcessor::armMidiLearn(const juce::String& parameterId)
+{
+    midiRouter_.arm(midiParameterIndex(parameterId));
+}
+
+void GuitarBiosphereAudioProcessor::clearMidiLearn(const juce::String& parameterId)
+{
+    midiRouter_.clear(midiParameterIndex(parameterId));
+}
+
+int GuitarBiosphereAudioProcessor::midiAssignment(const juce::String& parameterId) const
+{
+    return midiRouter_.assignment(midiParameterIndex(parameterId));
+}
+
+juce::String GuitarBiosphereAudioProcessor::midiParameterName(int index) const
+{
+    if (index >= 0 && index < midiParameterCount_)
+        return midiParameterIds_[static_cast<std::size_t>(index)];
+    return {};
+}
+
+void GuitarBiosphereAudioProcessor::timerCallback()
+{
+    // The host's parameter notification occurs here on the message thread,
+    // not in processBlock. A learnt CC therefore works without any editor.
+    for (int i = 0; i < midiParameterCount_; ++i)
+    {
+        const int value = midiRouter_.consume(i);
+        if (value < 0) continue;
+        if (auto* parameter = midiParameters_[static_cast<std::size_t>(i)])
+            parameter->setValueNotifyingHost(static_cast<float>(value) / 127.0f);
+    }
+}
+
 void GuitarBiosphereAudioProcessor::getStateInformation(juce::MemoryBlock& destination)
 {
     auto state = parameters.copyState();
+    // MIDI mappings are per DAW project, never new audio parameters.
+    if (auto previous = state.getChildWithName("MIDI_LEARN"); previous.isValid())
+        state.removeChild(previous, nullptr);
+    juce::ValueTree midi("MIDI_LEARN");
+    for (int index = 0; index < midiParameterCount_; ++index)
+    {
+        const int value = midiRouter_.assignment(index);
+        if (value < 0) continue;
+        juce::ValueTree link("CC");
+        link.setProperty("parameter",
+                         midiParameterIds_[static_cast<std::size_t>(index)], nullptr);
+        link.setProperty("channel",
+                         biosphere::midi::LearnRouter::channelOf(value), nullptr);
+        link.setProperty("controller",
+                         biosphere::midi::LearnRouter::controllerOf(value), nullptr);
+        midi.addChild(link, -1, nullptr);
+    }
+    state.addChild(midi, -1, nullptr);
     // UI-only selection; it must not become a host-automatable audio parameter.
     state.setProperty("editorPage", getSelectedEditorPage(), nullptr);
     state.setProperty("editorLanguage", isEnglish() ? "en" : "fr", nullptr);
@@ -223,6 +312,21 @@ void GuitarBiosphereAudioProcessor::setStateInformation(const void* data, int si
             else
                 setSelectedEditorPage(biosphere::ui::EngineNavigationState::defaultPage);
             setEnglish(restored.getProperty("editorLanguage", "fr").toString() == "en");
+            midiRouter_.clearAll();
+            const auto mappings = restored.getChildWithName("MIDI_LEARN");
+            if (mappings.isValid())
+            {
+                for (int index = 0; index < mappings.getNumChildren(); ++index)
+                {
+                    const auto entry = mappings.getChild(index);
+                    if (!entry.hasType("CC")) continue;
+                    const int parameterIndex = midiParameterIndex(
+                        entry.getProperty("parameter").toString());
+                    const int channel = static_cast<int>(entry.getProperty("channel", -1));
+                    const int controller = static_cast<int>(entry.getProperty("controller", -1));
+                    midiRouter_.assign(parameterIndex, channel, controller);
+                }
+            }
             parameters.replaceState(restored);
         }
     }

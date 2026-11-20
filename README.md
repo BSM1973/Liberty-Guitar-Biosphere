@@ -3,7 +3,7 @@
 
 Native C++20 / JUCE 8 guitar audio-effect plugin for macOS (AU / VST3) and Windows (VST3).
 
-## Development status — Phase 10
+## Development status — Phase 11 (VALIDATION PREMIUM / RELEASE CANDIDATE)
 
 This is an **early functional DSP foundation**, not a finished commercial product.
 
@@ -51,6 +51,101 @@ Not yet implemented:
 - Production-level audio validation and signed/notarized installers.
 
 No feature listed above as pending is represented as complete in the UI.
+
+## MIDI LEARN + NATIVE INSTALLERS — Phase 11 extensions
+
+**Right-click any existing DSP parameter control** in PULSE, HARMONIC LIFE,
+MUTATION, MEMORY, REACTION or EVOLUTION, or on a macro/master control.
+Choose **Apprendre le prochain CC MIDI / MIDI Learn: next CC**, then move a
+physical MIDI knob or fader. The device must be routed to the Guitar Biosphere
+plugin's MIDI input in the DAW.
+
+- MIDI channel **1–16** and CC **0–127** are learned together and displayed
+  in the context menu on later right-clicks.
+- The same menu can remove that assignment or clear all mappings.
+- Mappings are saved as a separate **MIDI_LEARN** child in the full DAW
+  project state (not in factory/user preset XML). They remain available when
+  the editor is closed and do not affect the existing **97 host APVTS IDs**.
+- The audio callback only transfers CC values through a lock-free fixed-size
+  queue; a **60 Hz message-thread timer** calls the host-notifying parameter
+  setter. MIDI learning is control-rate, **not sample accurate**. Incoming
+  MIDI remains intact; Guitar Biosphere does not generate MIDI notes.
+- Full-state A/B snapshots intentionally exclude MIDI_LEARN so comparison
+  and Undo/Redo do not unexpectedly reassign hardware controls.
+- No additional plugin GUI panels/scrollbars; the status line occupies a
+  previously empty footer region and uses FR or EN.
+
+**Installers for technical testing (unsigned):**
+
+- **macOS Apple Silicon .pkg** installs the AU at
+  /Library/Audio/Plug-Ins/Components and VST3 at
+  /Library/Audio/Plug-Ins/VST3; GitHub Actions builds and checks its payload.
+- **Windows x64 .exe** built with Inno Setup 6 installs VST3 under
+  C:\Program Files\Common Files\VST3; selectable French and English
+  installer languages, standard uninstall entry, and a silent install
+  verification on an ephemeral GitHub runner.
+- Both are published as **UNSIGNED-TEST** Actions artifacts after all native
+  tests and validator checks, not commercial customer packages.
+- The separate **commercial-release.yml** signs and notarizes the macOS
+  .pkg via Apple Developer ID and Authenticode-signs the Windows VST3 **and
+  .exe installer**, but only after real DAW/manual acceptance and certificates.
+
+## VALIDATION PREMIUM — Phase 11
+
+**Status:** DSP hardening integrated; the release candidate is not yet a
+signed, notarized commercial product. The real DAW and 100-preset listening
+sign-off remains **pending**, and the commercial gate intentionally defaults
+to **DENY**.
+
+### DSP stability and real-time work
+
+- Before modulation mapping, finite-check every incoming numeric host control
+  and bound REACTION/EVOLUTION routes; validate again after macro mapping.
+- Malformed NaN/Inf audio input is replaced with safe zeros before it can reach
+  PULSE, HARMONIC or MEMORY recirculation buffers. Invalid sample rates cannot
+  cause unbounded audio buffer allocations at prepare().
+- Share three harmonic movement oscillators between the left and right
+  channels, calculate nonlinear resonator excitation once/channel, and move
+  block-constant coefficients outside the audio sample/voice loops.
+- New **PremiumStability** regression: 44.1/48/96 kHz, both 1- and 2-channel
+  layouts, 1/16/32/64/127/256/512/2048 sample blocks, rapid automation,
+  invalid host input, stop/restart and zero audio-thread heap allocations.
+
+### Host-format tests and honest scope
+
+The cross-platform CI now runs **Tracktion pluginval** on real built
+AU/VST3 macOS and VST3 Windows, with a pinned action commit, 5/10 strictness,
+headless API validation and stored JUnit reports. A red validator **fails
+the build**, even if compilation and the C++ tests succeed.
+
+This is host API validation, **not** a claim that tests in Logic, Ableton,
+REAPER or another DAW were carried out. Real GUI/audio behavior on a
+13-inch display, all 100 preset listening/level comparisons and project
+recall must still be checked. See **docs/PREMIUM_QA.md**.
+
+### Signed distribution — safe, explicit gates
+
+The new **.github/workflows/commercial-release.yml** is manual and
+restricted to a trusted main branch. It checks version and a documented
+manual DAW approval file **before** accessing signing credentials:
+
+- macOS: imports existing Liberty-style Developer ID Application + Installer
+  certificates, signs both native plugin formats and the .pkg installer,
+  requires an Apple notarytool result of **Accepted**, staples the ticket,
+  verifies Gatekeeper and the *downloaded* artifact
+- Windows: uses a separate trusted Authenticode PFX to sign the internal
+  VST3 executable, timestamp it, verify the certificate chain and check
+  the downloaded signed ZIP SHA256
+- Missing certificate secrets or incomplete manual QA **must never**
+  produce a falsely labelled commercial artifact
+
+Apple signing requires six Action secrets, as with Organix; Windows signing
+needs a PFX and its password configured for this repository. Repository
+secrets are not copied automatically from another Liberty plugin.
+
+**No commercial signed builds have been produced merely by adding this
+workflow.** The project version remains 0.5.0 until a reviewed release
+decision. Standard Actions binaries are unsigned test artifacts.
 
 ## PRESET LAB — phase 10
 

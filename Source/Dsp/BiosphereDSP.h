@@ -71,7 +71,10 @@ struct AnalysisValues
 // All calculations are bounded and deterministic, with no dynamic allocation.
 inline Parameters mapPerformanceControls(Parameters p) noexcept
 {
-    const auto unit = [](float value) { return std::clamp(value, 0.0f, 1.0f); };
+    const auto unit = [](float value)
+    {
+        return std::clamp(std::isfinite(value) ? value : 0.0f, 0.0f, 1.0f);
+    };
     const float growth = unit(p.macroGrowth);
     const float motion = unit(p.macroMotion);
     const float space = unit(p.macroSpace);
@@ -113,7 +116,9 @@ public:
 
     void prepare(double sampleRate, int, int channels)
     {
-        sampleRate_ = std::max(8000.0, sampleRate);
+        // Hosts may briefly report an invalid rate during audio-device changes.
+        sampleRate_ = std::isfinite(sampleRate)
+            ? std::clamp(sampleRate, 8000.0, 384000.0) : 48000.0;
         channels_ = std::clamp(channels, 1, 2);
         grainCapacity_ = static_cast<std::size_t>(std::ceil(sampleRate_ * 3.0));
         // 12 seconds: at 3 s capture + 3 repeats the underlying source is
@@ -191,7 +196,8 @@ public:
         if (channels < 1 || data[0] == nullptr || (channels == 2 && data[1] == nullptr))
             return;
 
-        const Parameters p = sanitise(mapPerformanceControls(requested));
+        // Sanitise twice, because performance macros may amplify values.
+        const Parameters p = sanitise(mapPerformanceControls(sanitise(requested)));
         reactionMatrix_.configure(p.reaction.responseMs, p.reaction.reactivity);
         const float tempo = p.hasHostBpm ? p.hostBpm : 120.0f;
         const float beatHz = tempo / 60.0f;
@@ -250,6 +256,12 @@ public:
             1.0 - std::exp(-1.0 / (sampleRate_ * 0.014)));
         const float engineGateSmooth = static_cast<float>(
             1.0 - std::exp(-1.0 / (sampleRate_ * 0.023)));
+        // Block-invariant resonator coefficients: avoid re-evaluating their
+        // ranges and scaling inside six voice/channel inner loops.
+        const double harmonicDecayScale = std::clamp(
+            static_cast<double>(p.harmonicDecay), 0.1, 9.0);
+        const double harmonicDamp = 0.65 + (1.0 - p.harmonicDamping) * 0.85;
+        const float harmonicToneMix = 0.14f + 0.42f * (1.0f - p.harmonicDamping);
 
         for (int sample = 0; sample < samples; ++sample)
         {
@@ -287,7 +299,10 @@ public:
             float level = 0.0f;
             for (int channel = 0; channel < channels; ++channel)
             {
-                raw[static_cast<std::size_t>(channel)] = data[channel][sample];
+                // Malformed upstream audio must never poison feedback buffers.
+                const float incoming = data[channel][sample];
+                raw[static_cast<std::size_t>(channel)] =
+                    std::isfinite(incoming) ? incoming : 0.0f;
                 dry[static_cast<std::size_t>(channel)] = raw[static_cast<std::size_t>(channel)]
                                                       * smoothedInput_;
                 level += std::abs(dry[static_cast<std::size_t>(channel)]);
@@ -483,6 +498,13 @@ public:
             const auto& intervals = p.harmonicMono
                 ? musicalIntervals[static_cast<std::size_t>(p.harmonicMode)]
                 : fixedIntervals[static_cast<std::size_t>(p.harmonicMode)];
+            // Both stereo channels share the same harmonic modulation phase.
+            // Calculate three trigonometric LFOs once per sample, not twice.
+            const std::array<float, 3> harmonicLfo {
+                std::sin(phase_ * 0.43f),
+                std::sin(phase_ * 0.43f + 1.7f),
+                std::sin(phase_ * 0.43f + 3.4f)
+            };
             float tonalInstant = 0.0f;
             float pulseInstant = 0.0f, grainInstant = 0.0f, memoryInstant = 0.0f;
             for (int channel = 0; channel < channels; ++channel)
@@ -523,12 +545,15 @@ public:
                 pulseDelta *= engineGate_[0];
                 pulseInstant += std::abs(pulseDelta);
 
-                // HARMONIC LIFE: three independently tuned, bounded resonators.
+                // HARMONIC LIFE: compute non-linear excitation once per
+                // channel rather than three times for each resonator.
+                const double harmonicExcitation =
+                    std::tanh(dry[ch] * 1.50f) * 0.78;
                 float harmonicDelta = 0.0f;
                 for (int voice = 0; voice < 3; ++voice)
                 {
                     const float movement = harmonicMovement
-                        * std::sin(phase_ * 0.43f + voice * 1.7f);
+                        * harmonicLfo[static_cast<std::size_t>(voice)];
                     const float targetFrequency = std::clamp(
                         root * intervals[static_cast<std::size_t>(voice)]
                             * (1.0f + 0.035f * movement),
@@ -540,22 +565,17 @@ public:
                         state.frequency = targetFrequency;
                     state.frequency += harmonicTuneSmoothing
                                        * (targetFrequency - state.frequency);
-                    const double decayScale = std::clamp(
-                        static_cast<double>(p.harmonicDecay), 0.1, 9.0);
-                    const double damp = 0.65 + (1.0 - p.harmonicDamping) * 0.85;
-                    const double radius = std::exp(-state.frequency * damp
-                                                       / (12.0 * sampleRate_ * decayScale));
+                    const double radius = std::exp(-state.frequency * harmonicDamp
+                                        / (12.0 * sampleRate_ * harmonicDecayScale));
                     const double angle = twoPi * state.frequency / sampleRate_;
-                    const double excitation = std::tanh(dry[ch] * 1.50f) * 0.78;
-                    const double next = (1.0 - radius) * excitation
+                    const double next = (1.0 - radius) * harmonicExcitation
                         + 2.0 * radius * std::cos(angle) * state.last
                         - radius * radius * state.previous;
                     state.previous = state.last;
                     state.last = std::clamp(next, -5.0, 5.0);
                     // Damp upper harmonics of the resonator output without
                     // suppressing note tracking or smoothing the master dry.
-                    const float dampingMix = 0.14f + 0.42f * (1.0f - p.harmonicDamping);
-                    state.tone += dampingMix * (static_cast<float>(
+                    state.tone += harmonicToneMix * (static_cast<float>(
                         std::tanh(state.last * 0.85)) - state.tone);
                     harmonicDelta += state.tone;
                 }
@@ -740,7 +760,49 @@ private:
     // Defensive bounds on every numeric APVTS field before use.
     static Parameters sanitise(Parameters p) noexcept
     {
-        const auto unit = [](float value) { return std::clamp(value, 0.0f, 1.0f); };
+        const auto unit = [](float value)
+        {
+            return std::clamp(std::isfinite(value) ? value : 0.0f, 0.0f, 1.0f);
+        };
+        const Parameters defaults {};
+        const auto valid = [](float value, float fallback)
+        {
+            return std::isfinite(value) ? value : fallback;
+        };
+        p.inputGain = valid(p.inputGain, defaults.inputGain);
+        p.outputGain = valid(p.outputGain, defaults.outputGain);
+        p.rateHz = valid(p.rateHz, defaults.rateHz);
+        p.rootHz = valid(p.rootHz, defaults.rootHz);
+        p.grainMs = valid(p.grainMs, defaults.grainMs);
+        p.memoryFeedback = valid(p.memoryFeedback, defaults.memoryFeedback);
+        p.globalSpeed = valid(p.globalSpeed, defaults.globalSpeed);
+        p.hostBpm = valid(p.hostBpm, defaults.hostBpm);
+        p.harmonicDecay = valid(p.harmonicDecay, defaults.harmonicDecay);
+        p.mutationDensity = valid(p.mutationDensity, defaults.mutationDensity);
+        p.mutationPitch = valid(p.mutationPitch, defaults.mutationPitch);
+        p.memoryLength = valid(p.memoryLength, defaults.memoryLength);
+        p.memoryFade = valid(p.memoryFade, defaults.memoryFade);
+        p.reaction.reactivity = unit(p.reaction.reactivity);
+        p.reaction.interaction = unit(p.reaction.interaction);
+        p.reaction.sensitivity = unit(p.reaction.sensitivity);
+        p.reaction.complexity = unit(p.reaction.complexity);
+        p.reaction.responseMs = std::clamp(
+            valid(p.reaction.responseMs, defaults.reaction.responseMs),
+            30.0f, 500.0f);
+        for (auto& route : p.reaction.routes)
+        {
+            route.source = std::clamp(route.source, 0, 7);
+            route.destination = std::clamp(route.destination, 0, 7);
+            route.amount = std::clamp(valid(route.amount, 0.0f), -1.0f, 1.0f);
+        }
+        p.evolution.rate = std::clamp(valid(p.evolution.rate, defaults.evolution.rate),
+                                      0.25f, 4.0f);
+        p.evolution.intensity = unit(p.evolution.intensity);
+        p.evolution.sensitivity = unit(p.evolution.sensitivity);
+        p.evolution.stability = unit(p.evolution.stability);
+        p.evolution.complexity = unit(p.evolution.complexity);
+        p.evolution.recovery = std::clamp(
+            valid(p.evolution.recovery, defaults.evolution.recovery), 0.25f, 10.0f);
         p.inputGain = std::clamp(p.inputGain, 0.0f, 8.0f);
         p.outputGain = std::clamp(p.outputGain, 0.0f, 8.0f);
         p.mix = unit(p.mix);

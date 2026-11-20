@@ -9,6 +9,16 @@ include(CTest)
 
 # Unit tests for the JUCE-independent DSP core.
 if(BUILD_TESTING)
+    add_executable(BiosphereMidiLearnTests Tests/MidiLearnSmoke.cpp)
+    target_include_directories(BiosphereMidiLearnTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
+    target_compile_features(BiosphereMidiLearnTests PRIVATE cxx_std_20)
+    add_test(NAME BiosphereMidiLearnTests COMMAND BiosphereMidiLearnTests)
+
+    add_executable(BiospherePremiumStabilityTests Tests/PremiumStability.cpp)
+    target_include_directories(BiospherePremiumStabilityTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
+    target_compile_features(BiospherePremiumStabilityTests PRIVATE cxx_std_20)
+    add_test(NAME BiospherePremiumStabilityTests COMMAND BiospherePremiumStabilityTests)
+
     add_executable(BiosphereDSPTests Tests/DspSmoke.cpp)
     target_include_directories(BiosphereDSPTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
     target_compile_features(BiosphereDSPTests PRIVATE cxx_std_20)
@@ -88,7 +98,7 @@ juce_add_plugin(GuitarBiosphere
     PLUGIN_CODE GBio
     PRODUCT_NAME "Guitar Biosphere"
     IS_SYNTH FALSE
-    NEEDS_MIDI_INPUT FALSE
+    NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
@@ -123,6 +133,7 @@ target_sources(GuitarBiosphere PRIVATE
     Source/Dsp/EvolutionEngine.h
     Source/Dsp/GuitarPitchTracker.h
     Source/Dsp/BiosphereDSP.h
+    Source/Midi/MidiLearnRouter.h
 )
 
 if(MSVC)

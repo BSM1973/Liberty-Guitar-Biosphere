@@ -113,6 +113,8 @@ private:
         auto tree = state_.copyState();
         if (auto child = tree.getChildWithName("PRESET_LAB"); child.isValid())
             tree.removeChild(child, nullptr);
+        if (auto midi = tree.getChildWithName("MIDI_LEARN"); midi.isValid())
+            tree.removeChild(midi, nullptr);
         return tree;
     }
 
