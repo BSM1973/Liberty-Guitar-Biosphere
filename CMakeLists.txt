@@ -19,6 +19,16 @@ if(BUILD_TESTING)
     target_compile_features(BiosphereDspRoutingTests PRIVATE cxx_std_20)
     add_test(NAME BiosphereDspRoutingTests COMMAND BiosphereDspRoutingTests)
 
+    add_executable(BiosphereFactoryPresetTests Tests/FactoryPresetQuality.cpp)
+    target_include_directories(BiosphereFactoryPresetTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
+    target_compile_features(BiosphereFactoryPresetTests PRIVATE cxx_std_20)
+    add_test(NAME BiosphereFactoryPresetTests COMMAND BiosphereFactoryPresetTests)
+
+    add_executable(BiospherePresetHistoryTests Tests/PresetHistorySmoke.cpp)
+    target_include_directories(BiospherePresetHistoryTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
+    target_compile_features(BiospherePresetHistoryTests PRIVATE cxx_std_20)
+    add_test(NAME BiospherePresetHistoryTests COMMAND BiospherePresetHistoryTests)
+
     add_executable(BiosphereSoundEnginesProTests Tests/SoundEnginesPro.cpp)
     target_include_directories(BiosphereSoundEnginesProTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
     target_compile_features(BiosphereSoundEnginesProTests PRIVATE cxx_std_20)
@@ -98,6 +108,9 @@ target_sources(GuitarBiosphere PRIVATE
     Source/Ui/Localization.h
     Source/Ui/PresetLibrary.h
     Source/Ui/PresetLibrary.cpp
+    Source/Ui/FactoryPresetCatalog.h
+    Source/Ui/PresetHistory.h
+    Source/Ui/PresetLabState.h
     Source/Ui/PresetBrowser.h
     Source/Ui/PresetBrowser.cpp
     Source/Ui/EnginePanels.h
@@ -128,3 +141,15 @@ target_link_libraries(GuitarBiosphere PRIVATE
     juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags
 )
+
+# Native JUCE integration: checks A/B recall through actual APVTS ValueTrees.
+if(BUILD_TESTING)
+    add_executable(BiospherePresetLabNativeTests Tests/PresetLabNative.cpp)
+    target_include_directories(BiospherePresetLabNativeTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
+    target_compile_features(BiospherePresetLabNativeTests PRIVATE cxx_std_20)
+    target_link_libraries(BiospherePresetLabNativeTests PRIVATE
+        juce::juce_audio_processors
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)
+    add_test(NAME BiospherePresetLabNativeTests COMMAND BiospherePresetLabNativeTests)
+endif()
