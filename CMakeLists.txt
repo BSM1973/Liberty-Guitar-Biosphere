@@ -19,6 +19,11 @@ if(BUILD_TESTING)
     target_compile_features(BiosphereDspRoutingTests PRIVATE cxx_std_20)
     add_test(NAME BiosphereDspRoutingTests COMMAND BiosphereDspRoutingTests)
 
+    add_executable(BiosphereGuitarIntelligenceTests Tests/GuitarIntelligence.cpp)
+    target_include_directories(BiosphereGuitarIntelligenceTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
+    target_compile_features(BiosphereGuitarIntelligenceTests PRIVATE cxx_std_20)
+    add_test(NAME BiosphereGuitarIntelligenceTests COMMAND BiosphereGuitarIntelligenceTests)
+
     add_executable(BiosphereEvolutionTests Tests/EvolutionDynamics.cpp)
     target_include_directories(BiosphereEvolutionTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
     target_compile_features(BiosphereEvolutionTests PRIVATE cxx_std_20)
@@ -98,6 +103,7 @@ target_sources(GuitarBiosphere PRIVATE
     Source/Ui/EcosystemView.cpp
     Source/Dsp/ReactionMatrix.h
     Source/Dsp/EvolutionEngine.h
+    Source/Dsp/GuitarPitchTracker.h
     Source/Dsp/BiosphereDSP.h
 )
 
