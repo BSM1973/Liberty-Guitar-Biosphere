@@ -31,6 +31,10 @@ jobs:
         run: |
           c++ -std=c++20 -O2 -Wall -Wextra -Werror -ISource Tests/ReactionRouting.cpp -o biosphere-reaction-tests
           ./biosphere-reaction-tests
+      - name: Validate EVOLUTION living states, crossfades and audio routing
+        run: |
+          c++ -std=c++20 -O2 -Wall -Wextra -Werror -ISource Tests/EvolutionDynamics.cpp -o biosphere-evolution-tests
+          ./biosphere-evolution-tests
       - name: Build and run real-time shared analysis regression
         run: |
           c++ -std=c++20 -O2 -Wall -Wextra -Werror -ISource Tests/AnalysisSmoke.cpp -o biosphere-analysis-tests

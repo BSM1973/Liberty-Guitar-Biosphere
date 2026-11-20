@@ -130,7 +130,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
     number("mem.fade",          "Fondu (ms)", 5, 300, 45, 1);
     toggle("mem.freeze",        "Gel mémoire", false);
 
-    // EVOLUTION — state transitions and DSP routing are implemented later.
+    // EVOLUTION — six existing APVTS parameters, now forwarded to native DSP.
     toggle("evo.active",        "Evolution actif", true);
     number("evo.rate",          "Cadence évolution", 0.25f, 4, 1);
     number("evo.intensity",     "Intensité évolution", 0, 1, 0.60f);

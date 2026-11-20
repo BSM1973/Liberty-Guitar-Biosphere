@@ -3,7 +3,7 @@
 
 Native C++20 / JUCE 8 guitar audio-effect plugin for macOS (AU / VST3) and Windows (VST3).
 
-## Development status — Phase 6
+## Development status — Phase 7
 
 This is an **early functional DSP foundation**, not a finished commercial product.
 
@@ -32,6 +32,7 @@ Implemented:
 - MEMORY: recall duration, capture sensitivity, repeat rate, reverse blend, feedback, fade, freeze, independent mix and enable.
 - Four live performance macros (GROWTH, MOTION, SPACE, ENERGY) change multiple engine parameters without overwriting stored APVTS values.
 - Master bus: smoothed input/output gain, dry/wet, intensity, speed, processed stereo width, host BPM sync, global memory freeze and smooth raw bypass.
+- **EVOLUTION DSP is now connected**: deterministic CALME, CROISSANCE, TEMPÊTE and DÉCLIN states follow playing dynamics, with hysteresis and continuous modulation smoothing.
 - **REACTION DSP is now connected**: 8 independently smoothed, host-automatable bipolar routes link real PULSE, HARMONIC LIFE, MUTATION and MEMORY audio activity to 8 modulation destinations.
 - All 6 REACTION global controls (including on/off) and all 32 route controls are read from APVTS; no route-ID strings are allocated on the audio thread.
 - Routes map to live grain density, PULSE depth, harmonic movement/resonance, MEMORY recall/feedback, grain movement and PULSE rate.
@@ -44,19 +45,50 @@ Implemented:
 - Standalone, JUCE-free DSP smoke tests, and cross-platform GitHub Actions builds.
 
 Not yet implemented:
-- EVOLUTION ecosystem controller (its route source is deliberately silent until implemented).
+- Dedicated DAW listening/visual QA of EVOLUTION's state thresholds and release tails.
 - The complete set of 100 individually designed, auditioned and loudness-balanced factory presets (20 starter patches exist, not claimed as finalized).
 - Final listening QA, nuanced translation QA and any remaining design refinements after in-DAW testing.
 - Production-level audio validation and signed/notarized installers.
 
 No feature listed above as pending is represented as complete in the UI.
 
+## EVOLUTION — phase 7
+
+The existing six EVOLUTION controls already stored in APVTS are now read
+by the processor (no host parameter renaming):
+- **Cadence / Rate** (0.25–4x): how quickly the playing-state controller adapts
+- **Intensité / Intensity**: how much EVOLUTION changes the sound
+- **Sensibilité / Sensitivity**: when the guitar's energy becomes significant
+- **Stabilité / Stability**: hysteresis and minimum dwell to prevent flashing states
+- **Complexité / Complexity**: balance between granular and harmonic change
+- **Récupération / Recovery** (0.25–10s): how slowly intensity fades after playing
+
+Four actual states, measured from guitar input level and attack information:
+1. **CALME / CALM:** quiet, existing effect settings unmodified
+2. **CROISSANCE / GROWTH:** gentle increase of harmonic movement, pulse and texture
+3. **TEMPÊTE / STORM:** more active granular movement/density and richer harmonics
+4. **DÉCLIN / DECAY:** natural fade of additional modulation while existing
+   MEMORY fragments and harmonic resonances continue without sudden cuts
+
+Transitions are guarded by hysteresis and continuous low-pass smoothing.
+Changing state does NOT switch entire effects on/off, override user APVTS
+controls, reset buffers or apply abrupt gains to the master output.
+REACTION source index 6 now uses EVOLUTION's real evolving activity.
+
+The existing central ecosystem hub shows the actual state, with a small
+energy bar. FR/EN localization uses explicit UTF-8. The visual layout,
+fixed-size navy/gold design, and the six engine hotspots are unchanged.
+
+Automated tests synthesize gentle picking, intense playing, silence,
+recoveries, on/off transitions and live REACTION modulation. They do
+NOT replace real guitar monitoring in a host DAW.
+
 ## REACTION — phase 6
 
 The 8 existing routes are now connected to actual DSP signal sources. Source
 index values (existing preset format) are kept stable:
 0 attack; 1 envelope; 2 PULSE; 3 HARMONIC LIFE; 4 MUTATION; 5 MEMORY;
-6 EVOLUTION (zero until the EVOLUTION engine is ready); 7 silence.
+6 EVOLUTION (live playing-driven state activity); 7 silence.
 
 The 8 destinations retain the same stable index order:
 0 grain density; 1 PULSE depth; 2 harmonic movement; 3 MEMORY recall;
@@ -107,8 +139,8 @@ Future releases still need an in-host visual review and listening QA.
 ## DSP, macros and master bus — phase 4
 
 The four sound-producing DSP engines have **real mappings** from APVTS parameters.
-REACTION now interconnects those engines through a real-time modulation matrix and
-also responds to attacks, amplitude envelope, and silence. EVOLUTION remains reserved.
+REACTION interconnects the engines through a real-time matrix, while EVOLUTION now
+modulates them based on guitar playing strength, attacks and natural decay.
 
 DSP mappings:
 
@@ -195,7 +227,7 @@ Source: `Source/Dsp/BiosphereDSP.h` is independent of JUCE, enabling determinist
 ## Next milestones
 
 1. Check Phase-5 AU/VST3 artifacts and visually validate the exact 13-inch editor in DAWs.
-2. Develop the four-state EVOLUTION audio controller and its modulation source.
+2. Audition EVOLUTION states and balance their intensity using guitars and DAW recordings.
 3. Design, audition and balance all 100 final factory presets.
 4. Verify bilingual presentation and UI spacing in real hosts; finish stability/CPU tests.
 5. Apple Developer ID signing, notarization and Windows release preparation.

@@ -14,6 +14,8 @@ struct SharedAnalysisState
     std::atomic<float> tonalEnergy {0.0f}, rootHz {0.0f};
     std::atomic<float> inputPeak {0.0f}, outputPeak {0.0f};
     std::atomic<float> hostBpm {0.0f};
+    std::atomic<float> evolutionEnergy {0.0f};
+    std::atomic<int> evolutionState {0};
 };
 
 class GuitarBiosphereAudioProcessor final : public juce::AudioProcessor

@@ -165,7 +165,16 @@ void GuitarBiosphereAudioProcessor::processBlock(juce::AudioBuffer<float>& buffe
         route.amount = handles.amount->load(std::memory_order_relaxed);
     }
 
-    // EVOLUTION is not implemented yet. Its route source is deliberately 0.
+    // EVOLUTION: six existing APVTS controls — no new IDs and no per-block
+    // allocation; its state machine is driven by live guitar signal levels.
+    p.evolution.active = enabled("evo.active");
+    p.evolution.rate = value("evo.rate");
+    p.evolution.intensity = value("evo.intensity");
+    p.evolution.sensitivity = value("evo.sensitivity");
+    p.evolution.stability = value("evo.stability");
+    p.evolution.complexity = value("evo.complexity");
+    p.evolution.recovery = value("evo.recovery");
+
     float* audio[2] = { buffer.getWritePointer(0), channels > 1 ? buffer.getWritePointer(1) : nullptr };
     dsp_.process(audio, channels, samples, p);
 
@@ -177,6 +186,8 @@ void GuitarBiosphereAudioProcessor::processBlock(juce::AudioBuffer<float>& buffe
     analysis.memoryActivity.store(values.memoryActivity, std::memory_order_relaxed);
     analysis.tonalEnergy.store(values.tonalEnergy, std::memory_order_relaxed);
     analysis.rootHz.store(values.rootHz, std::memory_order_relaxed);
+    analysis.evolutionEnergy.store(values.evolutionEnergy, std::memory_order_relaxed);
+    analysis.evolutionState.store(values.evolutionState, std::memory_order_relaxed);
     analysis.hostBpm.store(p.hasHostBpm ? p.hostBpm : 0.0f, std::memory_order_relaxed);
     analysis.inputPeak.store(inputPeak, std::memory_order_relaxed);
     float outputPeak = 0.0f;

@@ -34,8 +34,8 @@ for name in (
 assert "p.hasHostBpm = true" in processor, "Host tempo was not forwarded"
 assert "dsp_.process(audio, channels, samples, p)" in processor, "DSP call missing"
 assert "p.bypass = enabled" in processor, "Smoothed bypass not wired"
-# REACTION runs the existing 8×4-parameter APVTS routing matrix; only
-# EVOLUTION remains reserved for a future native DSP controller.
+# REACTION (eight routes) and EVOLUTION (four states) are both active DSP
+# controllers. All host IDs are unchanged.
 for name in ("react.active", "react.reactivity", "react.interaction",
              "react.sensitivity", "react.response", "react.complexity"):
     assert f'"{name}"' in processor, f"REACTION control missing: {name}"
@@ -50,5 +50,13 @@ assert 'juce::String prefix = "react.route"' not in processor, (
 assert "p.reaction.active = enabled" in processor
 assert "ReactionMatrix reactionMatrix_" in dsp
 assert 'reactionMatrix_.tick(p.reaction, reactionSources)' in dsp
-assert '0.0f, // EVOLUTION has no DSP yet' in dsp
+for name in ("evo.active", "evo.rate", "evo.intensity", "evo.sensitivity",
+             "evo.stability", "evo.complexity", "evo.recovery"):
+    assert f'"{name}"' in processor, f"EVOLUTION APVTS control missing: {name}"
+assert "EvolutionEngine evolutionEngine_" in dsp
+assert "evolutionEngine_.tick(p.evolution, level, attackActivity_)" in dsp
+assert "evolving.activity, // actual EVOLUTION" in dsp
+assert "analysis.evolutionState.store(" in processor
+assert "analysis.evolutionEnergy.store(" in processor
+assert "ecosystem_.setLivingState(" in (root / "Source/PluginEditor.cpp").read_text(encoding="utf-8")
 print(f"DSP wiring audit PASS: {len(expected)} Phase-4 APVTS parameters forwarded")

@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <vector>
 #include "ReactionMatrix.h"
+#include "EvolutionEngine.h"
 
 namespace biosphere
 {
@@ -50,6 +51,7 @@ struct Parameters
 
     // Eight configurable links; IDs and choice indices match Phase-2 APVTS.
     ReactionSettings reaction;
+    EvolutionSettings evolution;
 };
 
 // Published only AFTER processing a block. The processor transfers these
@@ -58,6 +60,8 @@ struct AnalysisValues
 {
     float envelope = 0.0f, attacks = 0.0f, rhythmicActivity = 0.0f;
     float memoryActivity = 0.0f, tonalEnergy = 0.0f, rootHz = 0.0f;
+    float evolutionEnergy = 0.0f;
+    int evolutionState = 0;
 };
 
 // The four macros are non-destructive multipliers: raw APVTS values never change.
@@ -100,7 +104,8 @@ public:
     AnalysisValues getAnalysisValues() const noexcept
     {
         return { envelope_, attackActivity_, rhythmicActivity_,
-                 memoryActivity_, tonalEnergy_, trackedRoot_ };
+                 memoryActivity_, tonalEnergy_, trackedRoot_,
+                 evolutionEnergy_, evolutionState_ };
     }
 
     void prepare(double sampleRate, int, int channels)
@@ -119,6 +124,7 @@ public:
             pulseBuffer_[channel].assign(pulseCapacity_, 0.0f);
         }
         reactionMatrix_.prepare(sampleRate_);
+        evolutionEngine_.prepare(sampleRate_);
         reset();
     }
 
@@ -142,6 +148,9 @@ public:
         lastPeriod_ = 0;
         noiseSeed_ = 0x8fe34ae1u;
         reactionMatrix_.reset();
+        evolutionEngine_.reset();
+        evolutionEnergy_ = 0.0f;
+        evolutionState_ = 0;
         pulseSource_ = harmonicSource_ = grainSource_ = memorySource_ = 0.0f;
         previousMemoryExcitation_ = 0.0f;
         for (auto& channel : resonators_)
@@ -236,6 +245,12 @@ public:
             if (onset) attackCooldown_ = static_cast<int>(sampleRate_ * 0.095);
             attackActivity_ = onset ? 1.0f : attackActivity_ * 0.998f;
 
+            // EVOLUTION: real playing-energy tracker + four-state controller.
+            // State is discrete; engine influence is independently smoothed.
+            const auto evolving = evolutionEngine_.tick(p.evolution, level, attackActivity_);
+            evolutionEnergy_ = evolving.energy;
+            evolutionState_ = static_cast<int>(evolving.state);
+
             // Cross-engine inputs use the last finished audio sample.
             // Attack/envelope are live; PULSE, HARMONIC, GRAIN and MEMORY
             // come from measured engine outputs, preventing algebraic loops.
@@ -244,22 +259,30 @@ public:
                 attackActivity_,
                 std::clamp(envelope_ * 5.0f, 0.0f, 1.0f),
                 pulseSource_, harmonicSource_, grainSource_, memorySource_,
-                0.0f, // EVOLUTION has no DSP yet: no fabricated activity.
+                evolving.activity, // actual EVOLUTION playing-driven DSP activity
                 1.0f - std::clamp(envelope_ * 6.0f, 0.0f, 1.0f)
             };
             const auto cross = reactionMatrix_.tick(p.reaction, reactionSources);
             const float pulseDepth = std::clamp(p.pulse * (1.0f + 1.5f
-                * cross.at(ReactionDestination::pulseDepth)), 0.0f, 1.0f);
+                * cross.at(ReactionDestination::pulseDepth))
+                * (1.0f + 0.30f * evolving.drive), 0.0f, 1.0f);
+            const float texture = std::clamp(p.evolution.complexity, 0.0f, 1.0f);
             const float harmonicMovement = std::clamp(p.harmonicMotion + 0.70f
-                * cross.at(ReactionDestination::harmonicMotion), 0.0f, 1.0f);
+                * cross.at(ReactionDestination::harmonicMotion)
+                + 0.25f * evolving.drive * (1.0f - 0.45f * texture), 0.0f, 1.0f);
             const float harmonicStrength = std::clamp(p.harmonicResonance + 0.75f
-                * cross.at(ReactionDestination::harmonicResonance), 0.0f, 1.0f);
+                * cross.at(ReactionDestination::harmonicResonance)
+                + 0.18f * evolving.drive * (1.0f - 0.35f * texture), 0.0f, 1.0f);
             const float grainDensity = std::clamp(p.mutationDensity * (1.0f + 1.8f
-                * cross.at(ReactionDestination::grainDensity)), 1.0f, 80.0f);
+                * cross.at(ReactionDestination::grainDensity))
+                * (1.0f + 0.75f * evolving.drive * (0.25f + 0.75f * texture)),
+                1.0f, 80.0f);
             const float grainMotion = std::clamp(p.mutationMotion + 0.80f
-                * cross.at(ReactionDestination::grainMotion), 0.0f, 1.0f);
+                * cross.at(ReactionDestination::grainMotion)
+                + 0.30f * evolving.drive * texture, 0.0f, 1.0f);
             const float memoryRecall = std::clamp(p.memoryRecall + 0.90f
-                * cross.at(ReactionDestination::memoryRecall), 0.0f, 1.0f);
+                * cross.at(ReactionDestination::memoryRecall)
+                + 0.18f * evolving.drive, 0.0f, 1.0f);
             const float memoryFeedback = std::clamp(p.memoryFeedback + 0.65f
                 * cross.at(ReactionDestination::memoryFeedback), 0.0f, 0.95f);
             const float rateMultiplier = std::clamp(1.0f + 1.50f
@@ -620,7 +643,10 @@ private:
     float pulseSource_ = 0.0f, harmonicSource_ = 0.0f;
     float grainSource_ = 0.0f, memorySource_ = 0.0f;
     float previousMemoryExcitation_ = 0.0f;
+    float evolutionEnergy_ = 0.0f;
+    int evolutionState_ = 0;
     ReactionMatrix reactionMatrix_;
+    EvolutionEngine evolutionEngine_;
     float memoryActivity_ = 0.0f, tonalEnergy_ = 0.0f;
     float smoothedInput_ = 1.0f, smoothedOutput_ = 1.0f, smoothedMix_ = 0.65f;
     float smoothedWidth_ = 0.8f, smoothedIntensity_ = 0.5f, wetBypass_ = 1.0f;

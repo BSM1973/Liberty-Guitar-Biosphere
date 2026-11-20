@@ -329,5 +329,5 @@ EvolutionPanel::EvolutionPanel(juce::AudioProcessorValueTreeState& state)
         ControlSpec::dial("Stabilité", "evo.stability", 0, 1, 0.65f, " %"),
         ControlSpec::dial("Complexité", "evo.complexity", 0, 1, 0.65f, " %"),
         ControlSpec::dial("Récupération", "evo.recovery", 0.25f, 10, 4, " s")
-    }, false) {}
+    }, true) {}
 } // namespace biosphere::ui
