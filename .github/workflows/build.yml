@@ -2,7 +2,7 @@ name: Native Builds and DSP Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, development/midi-learn-installers-phase-12]
   pull_request:
   workflow_dispatch:
 
