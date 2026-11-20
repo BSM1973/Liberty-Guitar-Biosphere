@@ -218,6 +218,10 @@ inline std::vector<Patch> build()
         patch.category = categories[static_cast<std::size_t>(d.family)];
         auto put = [&patch](const char* id, float value)
         {
+            // Keep each ID unique even when a general fallback is overridden
+            // by an intentionally enabled REACTION route.
+            for (auto& [existing, stored] : patch.values)
+                if (existing == id) { stored = value; return; }
             patch.values.emplace_back(id, value);
         };
         put("mix", d.mix);
