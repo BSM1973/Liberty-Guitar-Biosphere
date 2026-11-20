@@ -19,6 +19,7 @@ public:
 
     void setSelectedEngine(int index);
     void setLanguage(bool english) { english_ = english; repaint(); }
+    void setLivingState(int state, float energy);
     int getSelectedEngine() const noexcept { return selected_; }
 
     void paint(juce::Graphics&) override;
@@ -41,6 +42,8 @@ private:
     juce::Point<float> getNodeCentre(int index) const;
     juce::Rectangle<float> getNodeHitBox(int index) const;
     bool english_ = false;
+    int livingState_ = 0;
+    float livingEnergy_ = 0.0f;
     int selected_ = EngineNavigationState::defaultPage;
     std::array<std::unique_ptr<Hotspot>, EngineNavigationState::pageCount> hotspots_ {};
 };
