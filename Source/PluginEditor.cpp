@@ -147,11 +147,8 @@ GuitarBiosphereAudioProcessorEditor::GuitarBiosphereAudioProcessorEditor(
 
     selectEngine(processor_.getSelectedEditorPage());
     setResizable(false, false);
-    midiLearnStatus_.setJustificationType(juce::Justification::centredLeft);
-    midiLearnStatus_.setColour(juce::Label::textColourId, gold);
-    midiLearnStatus_.setFont(juce::Font(juce::FontOptions(9.5f)));
-    midiLearnStatus_.setInterceptsMouseClicks(false, false);
-    addAndMakeVisible(midiLearnStatus_);
+    // The footer is intentionally empty. MIDI Learn remains accessible
+    // from the contextual menu, but no status label is rendered below.
     // Listener sees the original mouse event on all descendants, including
     // hidden engine panels when displayed. Parameter IDs are JUCE component
     // IDs, not inferred from captions or translated labels.
@@ -509,14 +506,7 @@ void GuitarBiosphereAudioProcessorEditor::paint(juce::Graphics& g)
     g.setColour(border);
     g.drawLine(443.0f, 596.0f, 443.0f, 705.0f, 1.0f);
 
-    g.setColour(muted);
-    g.setFont(juce::Font(juce::FontOptions(9.6f)));
-    g.drawText(tr("Votre guitare. Un univers sonore vivant.", processor_.isEnglish()), 30, 724, 330, 18,
-               juce::Justification::left);
-    g.drawText(tr(juce::String::fromUTF8("Phase 5 — analyse, presets et langues FR/EN."), processor_.isEnglish()),
-               360, 724, 510, 18, juce::Justification::centred);
-    g.setColour(gold);
-    g.drawText(tr("DSP & AIDE", processor_.isEnglish()), 1060, 724, 110, 18, juce::Justification::centredRight);
+    // Empty footer by design: no version, MIDI hint or decorative text.
 }
 
 void GuitarBiosphereAudioProcessorEditor::resized()
@@ -555,7 +545,6 @@ void GuitarBiosphereAudioProcessorEditor::resized()
     freeze_.setBounds(1044, 639, 112, 31);
     bypass_.setBounds(1044, 675, 112, 31);
     browser_.setBounds(68, 116, 1064, 520);
-    midiLearnStatus_.setBounds(880, 724, 175, 18);
 
     // Component transforms are relative to their parent's origin in JUCE.
     // Applying the same factor used in paint() scales every child position,
