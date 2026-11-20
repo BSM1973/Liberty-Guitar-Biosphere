@@ -1,0 +1,174 @@
+name: Guitar Biosphere — signed installer candidates (private QA)
+
+# Explicit owner-requested signing run. Candidates remain outside commercial
+# release until the separate premium gate and main workflow have passed.
+on:
+  push:
+    branches: [release/guitar-biosphere-installer-preview]
+
+permissions:
+  contents: read
+
+jobs:
+  apple-preview:
+    if: github.repository == 'BSM1973/Liberty-Guitar-Biosphere' && github.actor == 'BSM1973'
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Confirm signing and notarization credentials exist
+        shell: bash
+        env:
+          APP_P12: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_P12_BASE64 }}
+          INSTALL_P12: ${{ secrets.APPLE_DEVELOPER_ID_INSTALLER_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.APPLE_P12_PASSWORD }}
+          NOTARY_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_APP_PASSWORD }}
+          NOTARY_TEAM: ${{ secrets.APPLE_NOTARY_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          for key in APP_P12 INSTALL_P12 P12_PASSWORD NOTARY_ID NOTARY_PASSWORD NOTARY_TEAM; do
+            test -n "$(printenv "$key")" || { echo "::error::Missing $key in this repository; signed macOS build unavailable"; exit 1; }
+          done
+          bash -n tools/macos_sign_notarize.sh
+      - name: Build ARM64 AU and VST3; execute tests and UTF-8/geometry audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DBUILD_TESTING=ON
+          cmake --build build --config Release --parallel 3
+          ctest --test-dir build -C Release --output-on-failure
+          python3 Tests/verify_utf8.py
+          python3 Tests/verify_phase10.py
+      - name: Validate native Audio Unit
+        shell: bash
+        run: |
+          set -euo pipefail
+          built="build/GuitarBiosphere_artefacts/Release/AU/Guitar Biosphere.component"
+          target="$HOME/Library/Audio/Plug-Ins/Components/Guitar Biosphere.component"
+          mkdir -p "$(dirname "$target")"
+          /usr/bin/ditto "$built" "$target"
+          /usr/bin/codesign --force --deep --sign - "$target"
+          /usr/bin/codesign --verify --deep "$target"
+          killall -9 AudioComponentRegistrar >/dev/null 2>&1 || true
+          sleep 4
+          /usr/bin/auval -v aumf GBio Lbms
+      - name: Validate macOS VST3 through pluginval
+        uses: Tracktion/pluginval/validate@286684f72062250fd2494681b7ebdcb721f09e0d
+        with:
+          pluginval-version: v2.0.0-beta3
+          plugins: |
+            build/GuitarBiosphere_artefacts/Release/VST3/*.vst3
+          strictness-level: '5'
+          args: '--skip-gui-tests --timeout-ms 120000'
+      - name: Developer ID sign and notarize with Apple; staple Gatekeeper ticket
+        shell: bash
+        env:
+          APPLE_DEVELOPER_ID_APPLICATION_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_P12_BASE64 }}
+          APPLE_DEVELOPER_ID_INSTALLER_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_INSTALLER_P12_BASE64 }}
+          APPLE_P12_PASSWORD: ${{ secrets.APPLE_P12_PASSWORD }}
+          APPLE_NOTARY_APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
+          APPLE_NOTARY_APP_PASSWORD: ${{ secrets.APPLE_NOTARY_APP_PASSWORD }}
+          APPLE_NOTARY_TEAM_ID: ${{ secrets.APPLE_NOTARY_TEAM_ID }}
+        run: bash tools/macos_sign_notarize.sh 0.5.0
+      - name: Publish notarized macOS PKG for private QA only
+        uses: actions/upload-artifact@v4
+        with:
+          name: Guitar-Biosphere-macOS-ARM64-SIGNED-NOTARIZED-QA
+          path: release-output/Guitar-Biosphere-v0.5.0-macOS-SIGNED-NOTARIZED.pkg
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 90
+
+  windows-preview:
+    if: github.repository == 'BSM1973/Liberty-Guitar-Biosphere' && github.actor == 'BSM1973'
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Confirm Windows Authenticode credentials exist
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
+          WINDOWS_SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_PFX_BASE64) -or
+              [string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_PFX_PASSWORD)) {
+            throw 'Windows PFX signing credentials not set in Guitar Biosphere repository'
+          }
+      - name: Build Windows VST3 and run unit tests
+        shell: pwsh
+        run: |
+          cmake -S . -B build -A x64 -DBUILD_TESTING=ON
+          if ($LASTEXITCODE -ne 0) { throw 'CMake configure failed' }
+          cmake --build build --config Release --parallel 3
+          if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
+          ctest --test-dir build -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw 'Unit tests failed' }
+          python Tests/verify_utf8.py
+          if ($LASTEXITCODE -ne 0) { throw 'UI UTF-8 audit failed' }
+      - name: Validate Windows VST3 through pluginval
+        uses: Tracktion/pluginval/validate@286684f72062250fd2494681b7ebdcb721f09e0d
+        with:
+          pluginval-version: v2.0.0-beta3
+          plugins: |
+            build/GuitarBiosphere_artefacts/Release/VST3/*.vst3
+          strictness-level: '5'
+          args: '--skip-gui-tests --timeout-ms 120000'
+      - name: Sign and verify VST3 binary with Authenticode
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
+          WINDOWS_SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $bundle = 'build/GuitarBiosphere_artefacts/Release/VST3/Guitar Biosphere.vst3'
+          $binary = @(Get-ChildItem -LiteralPath $bundle -Filter '*.vst3' -Recurse -File)
+          if ($binary.Count -ne 1) { throw "Expected one VST3 binary; got $($binary.Count)" }
+          $kits = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Windows Kits/10/bin'
+          $signTools = @(Get-ChildItem -LiteralPath $kits -Filter 'signtool.exe' -Recurse -File |
+            Where-Object { $_.FullName -match '[\\/]x64[\\/]signtool.exe$' } |
+            Sort-Object FullName -Descending)
+          if ($signTools.Count -eq 0) { throw 'Windows SDK signtool missing' }
+          $pfx = Join-Path $env:RUNNER_TEMP 'biosphere-preview-sign.pfx'
+          try {
+            [System.IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_SIGNING_PFX_BASE64))
+            & $signTools[0].FullName sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /f $pfx /p $env:WINDOWS_SIGNING_PFX_PASSWORD $binary[0].FullName
+            if ($LASTEXITCODE -ne 0) { throw 'VST3 signing failed' }
+            & $signTools[0].FullName verify /pa /v $binary[0].FullName
+            if ($LASTEXITCODE -ne 0) { throw 'VST3 signature invalid' }
+          } finally {
+            Remove-Item -LiteralPath $pfx -Force -ErrorAction SilentlyContinue
+          }
+      - name: Prepare Inno Setup 6
+        shell: pwsh
+        run: |
+          $iscc = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Inno Setup 6/ISCC.exe'
+          if (!(Test-Path -LiteralPath $iscc)) {
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed' }
+          }
+      - name: Generate and sign Windows Setup.exe
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
+          WINDOWS_SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+        run: |
+          pwsh -NoProfile -File tools/windows_installer.ps1 -Version '0.5.0' -Signed
+          if ($LASTEXITCODE -ne 0) { throw 'Windows signed installer failed' }
+          $setup='release-output/Guitar-Biosphere-v0.5.0-Windows-x64-SIGNED-Setup.exe'
+          if ((Get-AuthenticodeSignature -LiteralPath $setup).Status -ne 'Valid') {
+            throw 'Final Windows installer signature invalid'
+          }
+      - name: Publish Windows signed Setup.exe for private QA only
+        uses: actions/upload-artifact@v4
+        with:
+          name: Guitar-Biosphere-Windows-x64-SIGNED-QA
+          path: release-output/Guitar-Biosphere-v0.5.0-Windows-x64-SIGNED-Setup.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 90
