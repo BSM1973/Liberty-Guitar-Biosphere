@@ -20,9 +20,9 @@ until the actual DAW checks have been performed and documented.
 
 | Host | Format | Steps | Status |
 | --- | --- | --- | --- |
-| Logic Pro, macOS Apple Silicon | AU | Rescan, load/save/reopen project, change tempo, automate 8 routes, test 100 presets, A/B and Undo/Redo; listen for clicks at 64/128/512 buffer | NOT RUN |
-| Ableton Live, macOS Apple Silicon | VST3 | Rescan, playback/record, automation, bypass/freeze, pitch tracking, repeated preset changes, offline bounce and reopen | NOT RUN |
-| REAPER, Windows x64 | VST3 | Host rescan, mono/stereo, sample-rate change, parameter automation, state restore and 100-preset navigation | NOT RUN |
+| Logic Pro, macOS Apple Silicon | AU | Rescan, load/save/reopen project, change tempo, automate 8 routes, MIDI Learn CC with mapped hardware, test 100 presets, A/B and Undo/Redo; listen for clicks at 64/128/512 buffer | NOT RUN |
+| Ableton Live, macOS Apple Silicon | VST3 | Rescan, playback/record, MIDI routing and Learn recall, automation, bypass/freeze, pitch tracking, repeated preset changes, offline bounce and reopen | NOT RUN |
+| REAPER, Windows x64 | VST3 | Host rescan, mono/stereo, sample-rate change, MIDI CC Learn/remap/clear, parameter automation, state restore and 100-preset navigation | NOT RUN |
 | macOS 13-inch display | FR / EN | Open every engine panel, browser and all A/B/Undo controls; inspect every string, accent and border at 100% scaling | NOT RUN |
 
 The plugin must remain stable after stop/play and when opening or closing the
@@ -70,8 +70,15 @@ GitHub Actions secrets required:
 
 The protected manual workflow rebuilds/tests the x64 VST3, runs pluginval,
 signs the internal executable with Authenticode SHA256 + timestamp, checks
-signature trust with Microsoft SignTool, packages a ZIP and re-verifies
-the exact uploaded ZIP hash. No signed Windows EXE installer is claimed.
+signature trust with Microsoft SignTool, then builds an Inno Setup 6
+**Windows x64 Setup.exe** containing the signed VST3. It separately signs the
+installer with Authenticode and verifies signature trust. Both the optional
+signed VST3 ZIP and signed Setup.exe are re-downloaded for SHA256 integrity
+comparison; the published Setup.exe signature is checked again.
+
+Standard, ungated native CI creates clearly named **UNSIGNED-TEST** installers:
+a macOS AU/VST3 .pkg and a Windows x64 VST3 Setup.exe. These are only for
+local technical tests; they are not signed/notarized and not for customers.
 
 Do not put .p12, .pfx, private keys or passwords in the repository or chat.
 Repository secrets are not transferable automatically between projects.
