@@ -157,6 +157,10 @@ public:
         pulseTapFade_ = 1.0f;
         pulseDelayCurrent_ = pulseDelayOld_ = 0;
         pulseFeedbackTone_.fill(0.0f);
+        memoryPrevious_ = {};
+        memoryCrossfadeRemaining_ = memoryCrossfadeLength_ = 0;
+        memoryReverseSmoothed_ = memoryFeedbackSmoothed_ = 0.0f;
+        engineGate_.fill(1.0f);
         guitarPitch_.reset();
         trackedRoot_ = pitchConfidence_ = smoothedHarmonicRoot_ = 0.0f;
         trackedMidiNote_ = -1;
@@ -229,6 +233,12 @@ public:
             smoothedHarmonicRoot_ = p.rootHz;
             pulseDelayCurrent_ = pulseDelayOld_ = delaySamples;
             pulseTapFade_ = 1.0f;
+            memoryReverseSmoothed_ = p.memoryReverse;
+            memoryFeedbackSmoothed_ = p.memoryFeedback;
+            engineGate_ = {p.pulseActive ? 1.0f : 0.0f,
+                           p.harmonicActive ? 1.0f : 0.0f,
+                           p.mutationActive ? 1.0f : 0.0f,
+                           p.memoryActive ? 1.0f : 0.0f};
             wetBypass_ = p.bypass ? 0.0f : 1.0f;
             smoothed_ = true;
         }
@@ -236,6 +246,10 @@ public:
                                  / (sampleRate_ * 0.007))), 0.000001f, 1.0f);
         const float harmonicTuneSmoothing = static_cast<float>(
             1.0 - std::exp(-1.0 / (sampleRate_ * 0.022)));
+        const float memoryParamSmooth = static_cast<float>(
+            1.0 - std::exp(-1.0 / (sampleRate_ * 0.014)));
+        const float engineGateSmooth = static_cast<float>(
+            1.0 - std::exp(-1.0 / (sampleRate_ * 0.023)));
 
         for (int sample = 0; sample < samples; ++sample)
         {
@@ -245,6 +259,17 @@ public:
             smoothedWidth_ += smooth * (p.globalWidth - smoothedWidth_);
             smoothedIntensity_ += smooth * (p.globalIntensity - smoothedIntensity_);
             wetBypass_ += smooth * ((p.bypass ? 0.0f : 1.0f) - wetBypass_);
+            const std::array<float, 4> gateTargets {
+                p.pulseActive ? 1.0f : 0.0f,
+                p.harmonicActive ? 1.0f : 0.0f,
+                p.mutationActive ? 1.0f : 0.0f,
+                p.memoryActive ? 1.0f : 0.0f
+            };
+            for (std::size_t engine = 0; engine < engineGate_.size(); ++engine)
+                engineGate_[engine] += engineGateSmooth
+                    * (gateTargets[engine] - engineGate_[engine]);
+            memoryReverseSmoothed_ += memoryParamSmooth
+                * (p.memoryReverse - memoryReverseSmoothed_);
 
             // PULSE PRO: independently crossfade old/new delay read heads
             // after tempo changes, rather than jumping the circular-buffer
@@ -320,6 +345,8 @@ public:
                 * cross.at(ReactionDestination::memoryFeedback), 0.0f, 0.95f);
             const float rateMultiplier = std::clamp(1.0f + 1.50f
                 * cross.at(ReactionDestination::pulseRate), 0.2f, 3.0f);
+            memoryFeedbackSmoothed_ += memoryParamSmooth
+                * (memoryFeedback - memoryFeedbackSmoothed_);
 
             // HARMONIC LIFE can re-trigger a stored MEMORY fragment.
             // Threshold + cooldown keep it musical (not one trigger/sample).
@@ -357,6 +384,16 @@ public:
                 && (harmonicMemoryTrigger || level > threshold * (1.20f - 0.80f * p.memoryCapture))
                 && processedSamples_ > static_cast<std::size_t>(sampleRate_ * 0.35))
             {
+                // MEMORY PRO: keep the old ghost playing during the 22ms
+                // crossfade; a new transient no longer cuts the current
+                // fragment at an arbitrary waveform phase.
+                if (memoryHasCapture_ && memoryAge_ >= 0 && memoryLength_ > 1)
+                {
+                    memoryPrevious_ = {memoryStart_, memoryLength_, memoryAge_, true};
+                    memoryCrossfadeLength_ = std::max(64,
+                        static_cast<int>(sampleRate_ * 0.022));
+                    memoryCrossfadeRemaining_ = memoryCrossfadeLength_;
+                }
                 // Early attacks can recall a shorter available history. No need
                 // to wait 3 seconds before the first audible memory fragment.
                 memoryLength_ = std::min(captureLength,
@@ -372,7 +409,8 @@ public:
 
             // A captured buffer may loop indefinitely while global/memory freeze is active.
             // No copies/allocations occur in the audio callback.
-            const bool shouldRecall = memoryHasCapture_ && p.memoryActive
+            const bool shouldRecall = memoryHasCapture_
+                && (p.memoryActive || engineGate_[3] > 0.0001f)
                 && (memoryAge_ >= 0 || freeze);
             if (shouldRecall && memoryAge_ < 0) memoryAge_ = 0;
 
@@ -568,28 +606,49 @@ public:
                     ? stableGrain * p.mutation : 0.0f;
                 grainInstant += std::abs(mutationDelta);
 
-                // MEMORY: windowed fragment with reverse blend and bounded repeats.
-                float memoryDelta = 0.0f;
-                if (shouldRecall && memoryLength_ > 1)
+                // MEMORY PRO: smoothstep edges avoid discontinuous changes
+                // in slope; the preceding ghost overlaps a new capture.
+                const auto recallSample = [&](std::size_t start,
+                                              int length, int age) noexcept
                 {
-                    const int position = memoryAge_ % memoryLength_;
-                    const int repetition = memoryAge_ / memoryLength_;
-                    const float up = std::min(1.0f, static_cast<float>(position)
-                                                 / static_cast<float>(fadeSamples));
+                    if (length <= 1 || age < 0) return 0.0f;
+                    const int position = age % length;
+                    const int repetition = age / length;
+                    const float up = std::min(1.0f,
+                        static_cast<float>(position) / static_cast<float>(fadeSamples));
                     const float down = std::min(1.0f,
-                        static_cast<float>(memoryLength_ - position - 1)
-                         / static_cast<float>(fadeSamples));
-                    const float window = std::max(0.0f, std::min(up, down));
-                    const auto forward = (memoryStart_ + static_cast<std::size_t>(position))
-                                         % memoryCapacity_;
-                    const auto backward = (memoryStart_ + static_cast<std::size_t>(
-                                              memoryLength_ - 1 - position)) % memoryCapacity_;
-                    const float echo = memoryBuffer_[ch][forward] * (1.0f - p.memoryReverse)
-                                     + memoryBuffer_[ch][backward] * p.memoryReverse;
-                    const float gain = std::pow(memoryFeedback,
-                        static_cast<float>(repetition % 3));
-                    memoryDelta = echo * window * gain * p.memory * memoryRecall;
+                        static_cast<float>(length - position - 1)
+                            / static_cast<float>(fadeSamples));
+                    const float edge = std::max(0.0f, std::min(up, down));
+                    const float window = edge * edge * (3.0f - 2.0f * edge);
+                    const auto forward = (start + static_cast<std::size_t>(position))
+                        % memoryCapacity_;
+                    const auto backward = (start + static_cast<std::size_t>(
+                        length - 1 - position)) % memoryCapacity_;
+                    const float echo = memoryBuffer_[ch][forward]
+                        * (1.0f - memoryReverseSmoothed_)
+                        + memoryBuffer_[ch][backward] * memoryReverseSmoothed_;
+                    const int iteration = repetition % 3;
+                    const float gain = iteration == 0 ? 1.0f
+                        : iteration == 1 ? memoryFeedbackSmoothed_
+                        : memoryFeedbackSmoothed_ * memoryFeedbackSmoothed_;
+                    return echo * window * gain * p.memory * memoryRecall;
+                };
+                float memoryDelta = shouldRecall
+                    ? recallSample(memoryStart_, memoryLength_, memoryAge_) : 0.0f;
+                if (memoryPrevious_.active && memoryCrossfadeRemaining_ > 0)
+                {
+                    const float previous = recallSample(
+                        memoryPrevious_.start, memoryPrevious_.length,
+                        memoryPrevious_.age);
+                    const float progress = 1.0f -
+                        static_cast<float>(memoryCrossfadeRemaining_)
+                            / static_cast<float>(memoryCrossfadeLength_);
+                    const float blend = progress * progress * (3.0f - 2.0f * progress);
+                    memoryDelta = previous * (1.0f - blend)
+                        + memoryDelta * blend;
                 }
+                memoryDelta *= engineGate_[3];
 
                 memoryInstant += std::abs(memoryDelta);
                 delta[ch] = pulseDelta + harmonicDelta + mutationDelta + memoryDelta;
@@ -607,6 +666,12 @@ public:
             memorySource_ += 0.015f * (std::clamp(memoryInstant * invChannels * 8.0f,
                                                  0.0f, 1.0f) - memorySource_);
 
+            if (memoryPrevious_.active && memoryCrossfadeRemaining_ > 0)
+            {
+                ++memoryPrevious_.age;
+                if (--memoryCrossfadeRemaining_ == 0)
+                    memoryPrevious_.active = false;
+            }
             if (shouldRecall)
             {
                 ++memoryAge_;
@@ -660,6 +725,12 @@ private:
     {
         double last = 0.0, previous = 0.0;
         float frequency = 0.0f, tone = 0.0f;
+    };
+    struct MemoryPlayback
+    {
+        std::size_t start = 0;
+        int length = 1, age = 0;
+        bool active = false;
     };
     struct Grain
     {
@@ -748,6 +819,10 @@ private:
     std::size_t processedSamples_ = 0, memoryStart_ = 0;
     int attackCooldown_ = 0, memoryCooldown_ = 0, grainCountdown_ = 0;
     int memoryAge_ = -1, memoryLength_ = 1;
+    MemoryPlayback memoryPrevious_ {};
+    int memoryCrossfadeLength_ = 0, memoryCrossfadeRemaining_ = 0;
+    float memoryReverseSmoothed_ = 0.0f, memoryFeedbackSmoothed_ = 0.0f;
+    std::array<float, 4> engineGate_ {1.0f, 1.0f, 1.0f, 1.0f};
     bool memoryHasCapture_ = false, smoothed_ = false;
     float phase_ = 0.0f, envelope_ = 0.0f;
     float attackActivity_ = 0.0f, rhythmicActivity_ = 0.0f;
