@@ -3,16 +3,16 @@
 
 Native C++20 / JUCE 8 guitar audio-effect plugin for macOS (AU / VST3) and Windows (VST3).
 
-## Development status — Phase 8
+## Development status — Phase 9
 
 This is an **early functional DSP foundation**, not a finished commercial product.
 
 Implemented:
-- **PULSE**: picking-responsive rhythmic amplitude modulation.
-- **HARMONIC LIFE**: three tuned, damped harmonic resonators.
-- **MUTATION**: live dual-grain overlap processing with a circular audio buffer.
-- **MEMORY**: transient-triggered ghost fragments, repeated with fading feedback.
-- Mono and stereo processing, bounded wet mix and output protection.
+- **PULSE PRO**: attack-aware rhythmic amplitude and delay, 45 ms tempo-retiming crossfade, damped soft-saturated feedback.
+- **HARMONIC LIFE PRO**: three individually glide-tuned resonators, controlled excitation and additional high-frequency damping.
+- **MUTATION PRO**: up to 24 overlapping grains per channel, fixed precomputed Hann windows, bounded cubic playback interpolation and smooth overlap normalization.
+- **MEMORY PRO**: repeating fragments with 22 ms old/new capture crossfade, smoothstep loop edges and smoothed reverse/feedback automation.
+- Mono and stereo processing, bounded wet mix and output protection; four engine on/off controls have 23 ms non-clicking gain ramps.
 - **97 stable APVTS parameters**, including the 11 original host IDs unchanged for existing sessions.
 - Six panels have working host-automatable Slider / ComboBox / Button attachments.
 - **8 REACTION routes** expose on/off, source, destination and bipolar amount (32 APVTS parameters).
@@ -51,6 +51,61 @@ Not yet implemented:
 - Production-level audio validation and signed/notarized installers.
 
 No feature listed above as pending is represented as complete in the UI.
+
+## SOUND ENGINES PRO — phase 9
+
+These improvements are connected to the **existing** four engines. No new
+APVTS IDs, preset serialization changes, panel dimensions or UI labels.
+The original 97-ID preset/automation contract is preserved.
+
+**PULSE PRO**
+- During tempo changes, the original delay position crossfades with the new
+  read head over **45 ms**, avoiding an immediate arbitrary sample jump.
+- Feedback recirculation is gently low-pass filtered and soft-limited;
+  the direct delay tap remains full-range for attack intelligibility.
+- The existing swing, attack sensitivity, wet control and REACTION routing
+  still affect the actual sound.
+
+**HARMONIC LIFE PRO**
+- Each of the three resonators now follows its target frequency with an
+  individual **22 ms pitch glide**. GUITAR INTELLIGENCE keeps its 55 ms
+  root glide, and both can operate together without discontinuous
+  resonator coefficient jumps.
+- Saturated input excitation and a controlled damping filter reduce sharp
+  edges and excessive high-frequency buildup. Existing four musical modes
+  and fixed-root compatibility remain available.
+
+**MUTATION PRO**
+- Voice pool increased from **2 to 24 grains per channel**. Free voices
+  are selected first instead of repeatedly replacing one of only two
+  sustaining grains; the worst-case 80 grains/s × 220 ms occupies
+  approximately 18 simultaneous grains per channel.
+- A **1025-sample raised-cosine (Hann) table** is prepared outside the
+  audio callback, then interpolated during overlapping grain playback.
+- **Bounded cubic Hermite interpolation** replaces simple linear playback
+  interpolation; long/re-pitched grains sound less stepped. This is not a
+  claim of fully alias-free pitch shifting.
+- Smooth density-dependent normalization and mild saturation prevent
+  high-overlap accumulation from becoming disproportionately loud.
+
+**MEMORY PRO**
+- A new captured ghost can overlap the previous ghost for **22 ms**:
+  existing tails are not immediately cut at the re-trigger sample.
+- Each fragment uses smoothstep in/out edges, minimizing slope changes at
+  fragment boundaries. Reverse and feedback automation is smoothed over
+  **14 ms**. Repeat and Freeze continue to work with the original controls.
+
+**Click-resistant active switches**: all four engines now use **23 ms**
+gain ramps on activation/deactivation without forcing the master dry signal
+to stop. This complements the already smoothed bypass and master controls.
+
+**Validation:** the dedicated C++ stereo stress test renders all four
+engines at challenging modulation settings and checks finite output,
+bounded peaks, click-safe transitions, recall activity and unchanged dry
+audio; CI retains previous DSP, REACTION, EVOLUTION, YIN pitch, UTF-8 and
+interface collision checks. CPU duration is reported as a measurement,
+not a guarantee of DAW real-time performance. Actual guitar audition and
+host/UI inspection remain required before a commercial release.
 
 ## GUITAR INTELLIGENCE — phase 8
 
