@@ -14,7 +14,7 @@ public:
     explicit PresetBrowser(PresetLibrary&);
     ~PresetBrowser() override;
 
-    std::function<void()> onClose, onPresetLoaded, onLibraryChanged;
+    std::function<void()> onClose, onBeforePresetLoad, onPresetLoaded, onLibraryChanged;
 
     void setLanguage(bool english);
     void refresh();
@@ -43,6 +43,6 @@ private:
     juce::ComboBox category_;
     juce::ListBox list_;
     juce::TextButton close_ { "X" }, load_ { "Charger" }, save_ { "Enregistrer" },
-        favorite_ { "☆" }, remove_ { "Supprimer" };
+        favorite_ { "F" }, remove_ { "Supprimer" };
 };
 } // namespace biosphere::ui

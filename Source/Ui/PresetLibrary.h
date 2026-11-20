@@ -31,8 +31,6 @@ public:
     juce::String error() const { return lastError_; }
 
 private:
-    void addFactory(const char* name, const char* category,
-                    std::initializer_list<std::pair<const char*, float>> changes);
     juce::File directory() const;
     juce::File favoriteFile() const;
     bool saveFavorites() const;

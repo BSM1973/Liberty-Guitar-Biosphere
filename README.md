@@ -3,7 +3,7 @@
 
 Native C++20 / JUCE 8 guitar audio-effect plugin for macOS (AU / VST3) and Windows (VST3).
 
-## Development status — Phase 9
+## Development status — Phase 10
 
 This is an **early functional DSP foundation**, not a finished commercial product.
 
@@ -37,20 +37,63 @@ Implemented:
 - All 6 REACTION global controls (including on/off) and all 32 route controls are read from APVTS; no route-ID strings are allocated on the audio thread.
 - Routes map to live grain density, PULSE depth, harmonic movement/resonance, MEMORY recall/feedback, grain movement and PULSE rate.
 - A rising harmonic-to-MEMORY recall route can retrigger a recorded fragment, respecting the memory cooldown and freeze switches.
-- Factory starter patch 20 now demonstrates the attack → PULSE → harmonic → MEMORY cascade; the factory starter count remains 20.
+- Factory patch 20 retains its attack → PULSE → harmonic → MEMORY cascade; all **100** factory sounds are available in ten 10-preset families.
 - **Shared analysis is live:** input/output peaks, envelope, attack activity, pulse/rhythm activity, MEMORY playback, measured harmonic output activity and a YIN-style monophonic note and pitch-confidence estimate.
 - Audio publishes analysis into atomic values, and the JUCE UI polls at 30 Hz (no UI work in the audio callback).
-- **Functional preset browser:** category/search/favorites, 20 usable factory starter patches, previous/next, user XML save/load, two-step delete confirmation, and user-specific favorite persistence.
+- **Functional preset browser:** category/search/favorites, 100 factory patches, previous/next, user XML save/load, two-step delete confirmation, and user-specific favorite persistence.
 - **Working FR/EN choice**, default FR, applied to all engine panels, shared analysis, macros, master bus, menus, routes and browser; language and last page are stored with the DAW session.
 - Standalone, JUCE-free DSP smoke tests, and cross-platform GitHub Actions builds.
 
 Not yet implemented:
 - Dedicated DAW listening/visual QA of EVOLUTION's state thresholds and release tails.
-- The complete set of 100 individually designed, auditioned and loudness-balanced factory presets (20 starter patches exist, not claimed as finalized).
+- Independent listening and loudness matching of all 100 presets on real guitars: the catalog and automated DSP rendering exist, but musical mastering is not yet signed off.
 - Final listening QA, nuanced translation QA and any remaining design refinements after in-DAW testing.
 - Production-level audio validation and signed/notarized installers.
 
 No feature listed above as pending is represented as complete in the UI.
+
+## PRESET LAB — phase 10
+
+**100 functional factory patches across 10 musical categories.**
+The original presets 01–20 retain their names, order and parameter recipes.
+The 80 additional sounds deliberately distribute PULSE, HARMONIC LIFE,
+MUTATION, MEMORY, macros and selected REACTION/EVOLUTION interactions across
+these ten families:
+
+1. ORGANIC CLEAN — clean articulation, fingerstyle and subtle harmonics
+2. LIVING AMBIENCE — evolving sustained textures
+3. RHYTHMIC PULSE — tempos, swing, tremolo and feedback gestures
+4. HARMONIC BLOOM — tracked musical intervals and resonators
+5. GRANULAR MUTATIONS — granular texture, pitch and density
+6. MEMORY GHOSTS — captures, reverses and fading fragments
+7. REACTIVE LEADS — attack-responsive solo sounds
+8. CINEMATIC WORLDS — wide harmonics and slow evolving atmospheres
+9. EXPERIMENTAL LIFE — unpredictable but bounded routing and textures
+10. PERFORMANCE ECOSYSTEMS — combined sound ecosystems and evolving chains
+
+**A/B comparison** uses two independently editable, full APVTS parameter
+snapshots. Clicking A or B recalls that snapshot. A and B persist together
+as UI-only PRESET_LAB data within the host project state; this is not an
+automatable parameter and does not alter the existing 97 host IDs.
+
+**Undo/Redo** capture all parameter changes and preset loads as bounded
+full-state history. Knob gestures are grouped into approximately 200 ms
+transactions; loading a factory or user preset records a separate step.
+Undo/Redo also restores the active A/B slot and name. Undo history is in
+the open editor; A/B comparison slots survive DAW project reloads. User
+preset XML contains only the selected sound, not unrelated A/B snapshots.
+
+The controls sit in the free header space above the preset combo box:
+A, B, ANNULER/UNDO and REFAIRE/REDO, checked with a geometry audit.
+No new scrollbars, missing glyphs, layout changes to the six engines or
+new audio parameters.
+
+**Automated coverage** renders all 100 presets with the existing DSP,
+checks each family's count, unique settings, output finiteness, peak bounds
+and RMS sanity, and tests Undo/Redo history and native APVTS A/B persistence.
+These checks are engineering QA, not claims of hearing or manually LUFS
+matching 100 guitar sounds. A listening and level-adjustment pass in a
+DAW is still required before commercial release.
 
 ## SOUND ENGINES PRO — phase 9
 
@@ -218,9 +261,9 @@ their named changes**. User presets save and restore complete APVTS XML to the p
 application-data directory, never to the plugin bundle; favorites persist independently.
 The browser supports category filtering, text search, keyboard/double-click loading, favorites,
 previous/next navigation, saving user presets and confirmed deletion. The current preset name
-is preserved in the host state. The initial 20 factory entries are a **starter library** across
-10 categories, not a substitute for the requested final collection of 100 professionally
-auditioned presets.
+is preserved in the host state. The 100 factory entries are now organized into ten categories of ten. Their
+parameter structures and audio renders are tested automatically. Independent
+in-DAW guitar audition and final loudness balancing remain pending.
 
 FR is the default, and FR/EN are changeable live. The language choice is a UI-only
 DAW-session property, not a host-automatable DSP parameter. APVTS IDs never change.

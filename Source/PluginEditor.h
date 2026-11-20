@@ -10,6 +10,7 @@
 #include "Ui/EngineNavigation.h"
 #include "Ui/PresetLibrary.h"
 #include "Ui/PresetBrowser.h"
+#include "Ui/PresetLabState.h"
 #include "Ui/Localization.h"
 
 class GuitarBiosphereAudioProcessorEditor final : public juce::AudioProcessorEditor, private juce::Timer
@@ -27,6 +28,8 @@ private:
     void refreshPresetSelector();
     void openBrowser();
     void chooseRelativePreset(int increment);
+    void loadCurrentPreset();
+    void refreshPresetLabButtons();
     struct GlobalControl
     {
         juce::Label label;
@@ -44,6 +47,7 @@ private:
     GuitarBiosphereAudioProcessor& processor_;
     biosphere::ui::PresetLibrary presetLibrary_;
     biosphere::ui::PresetBrowser browser_;
+    biosphere::ui::PresetLabState presetLab_;
 
     biosphere::ui::EcosystemView ecosystem_;
     biosphere::ui::AnalysisPanel analysis_;
@@ -59,6 +63,8 @@ private:
     std::array<GlobalControl, 10> globals_ {};
     juce::ComboBox preset_;
     juce::TextButton previous_ { "<" }, next_ { ">" }, library_ { "..." };
+    juce::TextButton compareA_ { "A" }, compareB_ { "B" };
+    juce::TextButton undo_ { "ANNULER" }, redo_ { "REFAIRE" };
     juce::TextButton french_ { "FR" }, english_ { "EN" };
     juce::TextButton sync_ { "Synchro hote" }, freeze_ { "Gel global" },
                      bypass_ { "Bypass global" };

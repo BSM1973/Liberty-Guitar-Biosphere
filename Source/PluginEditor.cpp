@@ -8,6 +8,7 @@ GuitarBiosphereAudioProcessorEditor::GuitarBiosphereAudioProcessorEditor(
     : juce::AudioProcessorEditor(&processor),
       processor_(processor),
       presetLibrary_(processor.parameters), browser_(presetLibrary_),
+      presetLab_(processor.parameters),
       pulse_(processor.parameters), harmonic_(processor.parameters),
       mutation_(processor.parameters), reaction_(processor.parameters),
       memory_(processor.parameters), evolution_(processor.parameters)
@@ -27,11 +28,7 @@ GuitarBiosphereAudioProcessorEditor::GuitarBiosphereAudioProcessorEditor(
 
     addAndMakeVisible(preset_);
     preset_.setTooltip(juce::String::fromUTF8("Choisir un préréglage d'usine ou personnel."));
-    preset_.onChange = [this]
-    {
-        if (preset_.getSelectedId() > 1)
-            presetLibrary_.load(preset_.getSelectedId() - 2);
-    };
+    preset_.onChange = [this] { loadCurrentPreset(); };
     refreshPresetSelector();
 
     for (auto* button : { &previous_, &next_, &library_, &french_, &english_ })
@@ -48,6 +45,38 @@ GuitarBiosphereAudioProcessorEditor::GuitarBiosphereAudioProcessorEditor(
     previous_.onClick = [this] { chooseRelativePreset(-1); };
     next_.onClick = [this] { chooseRelativePreset(1); };
     library_.onClick = [this] { openBrowser(); };
+
+    // Compact PRESET LAB controls in the unused upper-right header row.
+    // These do not overlap the preset selector or language buttons.
+    for (auto* button : { &compareA_, &compareB_, &undo_, &redo_ })
+    {
+        button->setColour(juce::TextButton::buttonColourId, raised);
+        button->setColour(juce::TextButton::textColourOffId, white);
+        button->setMouseCursor(juce::MouseCursor::PointingHandCursor);
+        addAndMakeVisible(button);
+    }
+    compareA_.onClick = [this]
+    {
+        presetLab_.choose(0);
+        refreshPresetSelector();
+        refreshPresetLabButtons();
+    };
+    compareB_.onClick = [this]
+    {
+        presetLab_.choose(1);
+        refreshPresetSelector();
+        refreshPresetLabButtons();
+    };
+    undo_.onClick = [this]
+    {
+        if (presetLab_.undo()) refreshPresetSelector();
+        refreshPresetLabButtons();
+    };
+    redo_.onClick = [this]
+    {
+        if (presetLab_.redo()) refreshPresetSelector();
+        refreshPresetLabButtons();
+    };
     french_.onClick = [this] { setLanguage(false); };
     english_.onClick = [this] { setLanguage(true); };
 
@@ -85,8 +114,19 @@ GuitarBiosphereAudioProcessorEditor::GuitarBiosphereAudioProcessorEditor(
         processor_.parameters, "global.bypass", bypass_);
 
     browser_.onClose = [this] { browser_.setVisible(false); };
-    browser_.onPresetLoaded = [this] { refreshPresetSelector(); };
-    browser_.onLibraryChanged = [this] { refreshPresetSelector(); };
+    browser_.onBeforePresetLoad = [this] { presetLab_.commitNow(); };
+    browser_.onPresetLoaded = [this]
+    {
+        presetLab_.commitNow();
+        refreshPresetSelector();
+        refreshPresetLabButtons();
+    };
+    browser_.onLibraryChanged = [this]
+    {
+        presetLab_.commitNow();
+        refreshPresetSelector();
+        refreshPresetLabButtons();
+    };
     addAndMakeVisible(browser_);
     browser_.setVisible(false);
 
@@ -94,6 +134,7 @@ GuitarBiosphereAudioProcessorEditor::GuitarBiosphereAudioProcessorEditor(
     setResizable(false, false);
     setSize(1200, 748);
     setLanguage(processor_.isEnglish());
+    refreshPresetLabButtons();
     startTimerHz(30);
 }
 
@@ -105,6 +146,10 @@ GuitarBiosphereAudioProcessorEditor::~GuitarBiosphereAudioProcessorEditor()
 
 void GuitarBiosphereAudioProcessorEditor::timerCallback()
 {
+    // Message thread only. Coalesce parameter knob edits into a 200 ms
+    // Undo step, rather than recording a step for every automation sample.
+    presetLab_.tick();
+    refreshPresetLabButtons();
     const auto& m = processor_.analysis;
     analysis_.setValues({
         m.envelope.load(std::memory_order_relaxed),
@@ -154,6 +199,15 @@ void GuitarBiosphereAudioProcessorEditor::setLanguage(bool english)
                        english ? gold.darker(0.60f) : raised);
     french_.setColour(juce::TextButton::textColourOffId, english ? white : gold);
     english_.setColour(juce::TextButton::textColourOffId, english ? gold : white);
+    undo_.setButtonText(english ? "UNDO" : "ANNULER");
+    redo_.setButtonText(english ? "REDO" : "REFAIRE");
+    compareA_.setTooltip(english ? "Recall comparison A" : "Rappeler la comparaison A");
+    compareB_.setTooltip(english ? "Recall comparison B" : "Rappeler la comparaison B");
+    undo_.setTooltip(english ? "Undo last preset or parameter edit"
+                             : juce::String::fromUTF8("Annuler la modification précédente"));
+    redo_.setTooltip(english ? "Redo last undone edit"
+                             : juce::String::fromUTF8("Rétablir la modification annulée"));
+    refreshPresetLabButtons();
     repaint();
 }
 
@@ -171,6 +225,29 @@ void GuitarBiosphereAudioProcessorEditor::refreshPresetSelector()
         if (item.name == selected) selectedId = index + 2;
     }
     preset_.setSelectedId(selectedId, juce::dontSendNotification);
+}
+
+void GuitarBiosphereAudioProcessorEditor::loadCurrentPreset()
+{
+    if (preset_.getSelectedId() <= 1) return;
+    presetLab_.commitNow();
+    if (presetLibrary_.load(preset_.getSelectedId() - 2))
+        presetLab_.commitNow();
+    refreshPresetSelector();
+    refreshPresetLabButtons();
+}
+
+void GuitarBiosphereAudioProcessorEditor::refreshPresetLabButtons()
+{
+    const bool isA = presetLab_.activeSlot() == 0;
+    compareA_.setColour(juce::TextButton::buttonColourId,
+                        isA ? gold.darker(0.55f) : raised);
+    compareB_.setColour(juce::TextButton::buttonColourId,
+                        isA ? raised : gold.darker(0.55f));
+    compareA_.setColour(juce::TextButton::textColourOffId, isA ? gold : white);
+    compareB_.setColour(juce::TextButton::textColourOffId, isA ? white : gold);
+    undo_.setEnabled(presetLab_.canUndo());
+    redo_.setEnabled(presetLab_.canRedo());
 }
 
 void GuitarBiosphereAudioProcessorEditor::chooseRelativePreset(int increment)
@@ -323,6 +400,12 @@ void GuitarBiosphereAudioProcessorEditor::resized()
     previous_.setBounds(821, 42, 35, 33);
     next_.setBounds(861, 42, 35, 33);
     library_.setBounds(901, 42, 40, 33);
+    // The PRESET heading occupies x567..752 at y19..36.
+    // A/B and Undo/Redo sit x756..940 without intersection.
+    compareA_.setBounds(756, 17, 26, 20);
+    compareB_.setBounds(788, 17, 26, 20);
+    undo_.setBounds(821, 17, 55, 20);
+    redo_.setBounds(883, 17, 57, 20);
     french_.setBounds(1094, 17, 37, 29);
     english_.setBounds(1138, 17, 37, 29);
 
