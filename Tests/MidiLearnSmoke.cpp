@@ -56,6 +56,18 @@ int main()
     router.receive(2,74,127);
     need(router.consume(3)==127,"Last CC of burst should win");
 
+    // Reassigning an already learned CC must not move multiple controls.
+    router.assign(5,2,74);
+    need(router.assignment(3)==-1, "Prior owner of reassigned CC not cleared");
+    router.receive(2,74,67);
+    need(router.consume(3)==-1 && router.consume(5)==67,
+         "Reassigned CC must target only the new parameter");
+    router.receive(2,74,24);
+    router.clear(5);
+    need(router.consume(5)==-1,"Clearing a CC must discard pending automation");
+    router.assign(5,0,74);
+    need(router.assignment(5)==-1,"Invalid channel must not create a binding");
+
     router.assign(4,16,127);
     router.receive(16,127,64);
     need(router.consume(4)==64,"Channel 16 / CC127 not supported");
