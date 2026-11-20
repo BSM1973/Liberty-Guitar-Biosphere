@@ -7,7 +7,10 @@
     "reaper_windows_vst3": false,
     "preset_100_listening_and_balance": false,
     "ab_undo_redo_project_reopen": false,
-    "screen_13inch_fr_en_no_overlap": false
+    "screen_13inch_fr_en_no_overlap": false,
+    "midi_learn_real_controller_and_project_reload": false,
+    "macos_pkg_install_reopen": false,
+    "windows_exe_install_reopen": false
   },
   "evidence": {
     "notes": "PENDING: no manual DAW listening/host validation report has been supplied; do not approve or sign a commercial release.",
