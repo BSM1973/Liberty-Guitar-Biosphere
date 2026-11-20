@@ -13,7 +13,8 @@
 #include "Ui/PresetLabState.h"
 #include "Ui/Localization.h"
 
-class GuitarBiosphereAudioProcessorEditor final : public juce::AudioProcessorEditor, private juce::Timer
+class GuitarBiosphereAudioProcessorEditor final : public juce::AudioProcessorEditor,
+                                                  private juce::Timer, private juce::MouseListener
 {
 public:
     explicit GuitarBiosphereAudioProcessorEditor(GuitarBiosphereAudioProcessor&);
@@ -24,6 +25,9 @@ public:
 
 private:
     void timerCallback() override;
+    void mouseDown(const juce::MouseEvent&) override;
+    void showMidiMenu(juce::Component&, const juce::String& parameterId);
+    void updateMidiStatus();
     void setLanguage(bool english);
     void refreshPresetSelector();
     void openBrowser();
@@ -66,6 +70,7 @@ private:
     juce::TextButton compareA_ { "A" }, compareB_ { "B" };
     juce::TextButton undo_ { "ANNULER" }, redo_ { "REFAIRE" };
     juce::TextButton french_ { "FR" }, english_ { "EN" };
+    juce::Label midiLearnStatus_;
     juce::TextButton sync_ { "Synchro hote" }, freeze_ { "Gel global" },
                      bypass_ { "Bypass global" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> syncAttachment_;
