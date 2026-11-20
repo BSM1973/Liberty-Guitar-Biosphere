@@ -3,7 +3,7 @@
 
 Native C++20 / JUCE 8 guitar audio-effect plugin for macOS (AU / VST3) and Windows (VST3).
 
-## Development status — Phase 7
+## Development status — Phase 8
 
 This is an **early functional DSP foundation**, not a finished commercial product.
 
@@ -27,7 +27,7 @@ Implemented:
 - Independent navigation regression tests check all six node/panel mappings and invalid indices.
 - The existing four native audio engines now read their APVTS controls in the processor and produce measurable parameter-dependent audio.
 - PULSE: intensity, sensitivity, synced/free tempo, swing, feedback delay, stereo modulation, independent mix and enable.
-- HARMONIC LIFE: mode, root, resonance, decay, damping, motion, spread and conservative monophonic tracking.
+- HARMONIC LIFE: mode, root, resonance, decay, damping, motion, spread and YIN-style monophonic musical note-following.
 - MUTATION: grain size, density, character, pitch, motion, randomness and stereo variation.
 - MEMORY: recall duration, capture sensitivity, repeat rate, reverse blend, feedback, fade, freeze, independent mix and enable.
 - Four live performance macros (GROWTH, MOTION, SPACE, ENERGY) change multiple engine parameters without overwriting stored APVTS values.
@@ -38,7 +38,7 @@ Implemented:
 - Routes map to live grain density, PULSE depth, harmonic movement/resonance, MEMORY recall/feedback, grain movement and PULSE rate.
 - A rising harmonic-to-MEMORY recall route can retrigger a recorded fragment, respecting the memory cooldown and freeze switches.
 - Factory starter patch 20 now demonstrates the attack → PULSE → harmonic → MEMORY cascade; the factory starter count remains 20.
-- **Shared analysis is live:** input/output peaks, envelope, attack activity, pulse/rhythm activity, MEMORY playback, measured harmonic output activity and a conservative monophonic root estimate.
+- **Shared analysis is live:** input/output peaks, envelope, attack activity, pulse/rhythm activity, MEMORY playback, measured harmonic output activity and a YIN-style monophonic note and pitch-confidence estimate.
 - Audio publishes analysis into atomic values, and the JUCE UI polls at 30 Hz (no UI work in the audio callback).
 - **Functional preset browser:** category/search/favorites, 20 usable factory starter patches, previous/next, user XML save/load, two-step delete confirmation, and user-specific favorite persistence.
 - **Working FR/EN choice**, default FR, applied to all engine panels, shared analysis, macros, master bus, menus, routes and browser; language and last page are stored with the DAW session.
@@ -51,6 +51,42 @@ Not yet implemented:
 - Production-level audio validation and signed/notarized installers.
 
 No feature listed above as pending is represented as complete in the UI.
+
+## GUITAR INTELLIGENCE — phase 8
+
+The former simple zero-crossing guitar fundamental estimate has been replaced
+with a **downsampled YIN-style cumulative mean normalized difference**
+monophonic tracker. The tracker supports approximately E2-E5, estimates
+confidence, rejects low-confidence/noisy segments, protects the immediate
+attack transient, requires repeated evidence before accepting a large
+pitch jump, smooths sustain/bends, and releases notes in silence. It uses
+fixed-size preallocated arrays in the audio callback, with approximately
+17 ms analysis hops at common sample rates and a longer observation window.
+
+- The existing **Suivi mono / Mono tracking** APVTS switch controls musical
+  HARMONIC LIFE tracking. No new APVTS IDs and no changed factory preset IDs.
+- When **ON** and confidence is strong, the guitar's detected note controls
+  the root of the existing three harmonic resonators. The existing four
+  harmony menus use **12-tone equal-tempered** note relationships:
+  fifths (0,+7,+12), octaves (0,+12,+24), thirds (0,+4,+7), suspended
+  (0,+5,+7 semitones).
+- When **OFF**, original fixed-root behavior and existing harmonic
+  ratios remain unchanged. Loss of a reliable monophonic pitch causes a
+  55 ms glide back to the original root parameter, not a sudden retune.
+- The existing shared-analysis panel shows a detected note (for example
+  G3), its measured Hz and a confidence percentage. An unstable or
+  absent pitch shows a dash and a neutral status, not a fabricated note.
+- The source is the pre-effect first guitar audio channel, not the wet
+  output: reverb/delay/resonator feedback cannot recursively fool pitch
+  tracking. Input level, high noise, chords or strong distortion can still
+  reduce tracking accuracy; **this is not polyphonic transcription**.
+- Existing REACTION and EVOLUTION modulation, master processing and presets
+  stay intact. The window's geometry and colors remain unchanged.
+
+Dedicated C++ regression checks pitch accuracy across 44.1, 48 and 96kHz,
+note transitions, sustained notes, silence/recovery, harmonic audio effect,
+and dry-input transparency. Visual inspection and audio comparison against
+real guitars in multiple DAWs are still needed.
 
 ## EVOLUTION — phase 7
 
@@ -117,7 +153,7 @@ The shared analysis panel now reads real audio-engine measurements:
 - RMS-like smoothed input envelope and onset activity from the DSP
 - pulse-related rhythmic activity and MEMORY playback activity
 - absolute measured harmonic contribution (not a decorative meter)
-- conservative zero-crossing monophonic root detection, shown as a dash if unavailable
+- confidence-gated YIN-style guitar fundamental detection; displays musical note, Hz and confidence when voiced
 - actual per-block input and output peaks in the upper bar
 - 30 Hz atomic transfer from the audio thread to the UI; no repaint on the audio callback
 
@@ -156,8 +192,7 @@ DSP mappings:
 - **HOST SYNC:** reads BPM from JUCE host position only if available; uses free rate otherwise
 
 A JUCE-independent DSP test and a processor mapping audit now run under GitHub Actions.
-All allocation happens in `prepare()`, not `process()`. Onset tracking and modulation
-are lightweight and deliberately approximate; no claim of perfect polyphonic tracking.
+All engine audio storage is allocated in `prepare()`, not `process()`. GUITAR INTELLIGENCE uses fixed-size arrays and an analysis hop. It does not claim perfect polyphonic tracking or note recognition from arbitrary chords.
 Memory uses bounded 12-second preallocated circular buffers to avoid overwriting
 3-second fragments before their third replay.
 
