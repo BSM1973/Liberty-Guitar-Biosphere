@@ -106,7 +106,10 @@ jobs:
           target="$HOME/Library/Audio/Plug-Ins/Components/Guitar Biosphere.component"
           mkdir -p "$(dirname "$target")"
           /usr/bin/ditto "$built" "$target"
-          /usr/bin/codesign --verify --deep --verbose=2 "$target"
+          # JUCE's ad-hoc bundle signature may be stale after copying:
+          # re-sign the complete AU bundle in the disposable QA account.
+          /usr/bin/codesign --force --deep --sign - "$target"
+          /usr/bin/codesign --verify --deep --strict --verbose=2 "$target"
           killall -9 AudioComponentRegistrar >/dev/null 2>&1 || true
           sleep 4
           /usr/bin/auval -a
