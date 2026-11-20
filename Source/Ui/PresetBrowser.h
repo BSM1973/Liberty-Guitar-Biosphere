@@ -14,7 +14,7 @@ public:
     explicit PresetBrowser(PresetLibrary&);
     ~PresetBrowser() override;
 
-    std::function<void()> onClose, onPresetLoaded, onLibraryChanged;
+    std::function<void()> onClose, onBeforePresetLoad, onPresetLoaded, onLibraryChanged;
 
     void setLanguage(bool english);
     void refresh();
