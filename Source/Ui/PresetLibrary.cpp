@@ -150,6 +150,8 @@ bool PresetLibrary::saveUser(juce::String name)
     // individual user sound. Avoid embedding two unrelated presets in XML.
     if (auto lab = presetState.getChildWithName("PRESET_LAB"); lab.isValid())
         presetState.removeChild(lab, nullptr);
+    if (auto midi = presetState.getChildWithName("MIDI_LEARN"); midi.isValid())
+        presetState.removeChild(midi, nullptr);
     auto xml = presetState.createXml();
     if (!xml || !file.replaceWithText(xml->toString()))
     {
