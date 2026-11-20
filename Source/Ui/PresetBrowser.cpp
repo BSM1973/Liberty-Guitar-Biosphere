@@ -191,6 +191,7 @@ void PresetBrowser::loadSelected()
 {
     const int index = selectedIndex();
     if (index < 0) return;
+    if (onBeforePresetLoad) onBeforePresetLoad();
     if (!library_.load(index))
     {
         status_.setText(library_.error(), juce::dontSendNotification);
@@ -251,8 +252,8 @@ void PresetBrowser::paint(juce::Graphics& g)
     g.drawLine(25.0f, 57.0f, static_cast<float>(getWidth() - 25), 57.0f, 0.8f);
     g.setColour(muted);
     g.setFont(juce::Font(juce::FontOptions(10.5f)));
-    g.drawText(english_ ? "20 factory starter sounds + your own presets"
-                        : juce::String::fromUTF8("20 sons d'usine de départ + vos préréglages"),
+    g.drawText(english_ ? "100 factory sounds + your own presets"
+                        : juce::String::fromUTF8("100 sons d'usine + vos préréglages"),
                24, 64, getWidth() - 48, 17, juce::Justification::left);
 }
 
