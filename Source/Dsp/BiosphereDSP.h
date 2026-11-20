@@ -120,6 +120,14 @@ public:
         // not overwritten before the last playback completes.
         memoryCapacity_ = static_cast<std::size_t>(std::ceil(sampleRate_ * 12.0));
         pulseCapacity_ = static_cast<std::size_t>(std::ceil(sampleRate_ * 2.0));
+        // Window is prepared once; no sine calculation for every grain/sample.
+        for (std::size_t i = 0; i < grainWindow_.size(); ++i)
+        {
+            const float position = static_cast<float>(i)
+                / static_cast<float>(grainWindow_.size() - 1);
+            const float sine = std::sin(static_cast<float>(pi) * position);
+            grainWindow_[i] = sine * sine;
+        }
         for (int channel = 0; channel < 2; ++channel)
         {
             grainsBuffer_[channel].assign(grainCapacity_, 0.0f);
@@ -139,7 +147,7 @@ public:
         grainWrite_ = memoryWrite_ = pulseWrite_ = 0;
         processedSamples_ = 0;
         attackCooldown_ = memoryCooldown_ = grainCountdown_ = 0;
-        grainVoice_ = 0;
+        grainNormalizer_.fill(1.0f);
         memoryAge_ = -1;
         memoryStart_ = 0;
         memoryLength_ = 1;
@@ -372,8 +380,22 @@ public:
             {
                 for (int channel = 0; channel < channels; ++channel)
                 {
-                    auto& voice = grains_[static_cast<std::size_t>(channel)]
-                                         [static_cast<std::size_t>(grainVoice_)];
+                    auto& pool = grains_[static_cast<std::size_t>(channel)];
+                    // Prefer an unused grain voice. With 24 slots/channel,
+                    // even the 80 grains/s * 220 ms maximum has spare voices.
+                    // Rare overloads replace only the closest-to-end voice.
+                    auto chosen = pool.begin();
+                    bool idleFound = false;
+                    float oldest = -1.0f;
+                    for (auto it = pool.begin(); it != pool.end(); ++it)
+                    {
+                        if (!it->active) { chosen = it; idleFound = true; break; }
+                        const float progress = static_cast<float>(it->age)
+                            / static_cast<float>(std::max(1, it->length));
+                        if (progress > oldest) { oldest = progress; chosen = it; }
+                    }
+                    (void) idleFound;
+                    auto& voice = *chosen;
                     voice.active = true;
                     voice.age = 0;
                     voice.length = grainLength;
@@ -388,7 +410,6 @@ public:
                                             * grainMotion * 0.18;
                     voice.speed = std::clamp(grainPitch * variation * movement, 0.25, 4.0);
                 }
-                grainVoice_ = 1 - grainVoice_;
                 grainCountdown_ = std::max(48,
                     static_cast<int>(sampleRate_ / grainDensity));
             }
@@ -510,24 +531,41 @@ public:
 
                 // MUTATION: overlapping tapered grains from live circular audio.
                 float grainWet = 0.0f;
+                float grainWindowWeight = 0.0f;
                 for (auto& voice : grains_[ch])
                 {
                     if (!voice.active) continue;
                     const float progress = static_cast<float>(voice.age)
                                             / static_cast<float>(std::max(1, voice.length));
-                    const float window = std::sin(static_cast<float>(pi) * progress);
+                    const float lookup = progress
+                        * static_cast<float>(grainWindow_.size() - 1);
+                    const auto index = static_cast<std::size_t>(lookup);
+                    const float fraction = lookup - static_cast<float>(index);
+                    const auto second = std::min(index + 1, grainWindow_.size() - 1);
+                    const float window = grainWindow_[index]
+                        + (grainWindow_[second] - grainWindow_[index]) * fraction;
                     float sampleGrain = readInterpolated(grainsBuffer_[ch], voice.readPosition);
                     if (p.mutationCharacter == 1) sampleGrain = std::tanh(sampleGrain * 2.0f);
                     if (p.mutationCharacter == 2) sampleGrain = std::sin(sampleGrain * 12.0f) * 0.48f;
                     if (p.mutationCharacter == 3) sampleGrain = std::tanh(sampleGrain * 0.75f);
-                    grainWet += sampleGrain * window * window * 0.65f;
+                    grainWet += sampleGrain * window * 0.65f;
+                    grainWindowWeight += window;
                     voice.readPosition += voice.speed;
                     if (voice.readPosition >= static_cast<double>(grainCapacity_))
                         voice.readPosition -= static_cast<double>(grainCapacity_);
                     if (++voice.age >= voice.length) voice.active = false;
                 }
+                // Normalization prevents overlapping grains from inflating
+                // volume as density rises. Slow gain tracking avoids pumping
+                // when another grain begins or ends.
+                const float desiredGrainGain = 1.0f / std::sqrt(
+                    std::max(1.0f, grainWindowWeight));
+                grainNormalizer_[ch] += 0.004f
+                    * (desiredGrainGain - grainNormalizer_[ch]);
+                const float stableGrain = std::tanh(
+                    grainWet * grainNormalizer_[ch] * 0.85f) * 1.10f;
                 const float mutationDelta = p.mutationActive
-                    ? grainWet * p.mutation : 0.0f;
+                    ? stableGrain * p.mutation : 0.0f;
                 grainInstant += std::abs(mutationDelta);
 
                 // MEMORY: windowed fragment with reverse blend and bounded repeats.
@@ -686,10 +724,21 @@ private:
 
     float readInterpolated(const std::vector<float>& buffer, double position) const noexcept
     {
+        // Cubic Hermite interpolation provides smoother fractional-speed
+        // playback than linear sample reads, with bounded overshoot.
         const auto base = static_cast<std::size_t>(position) % grainCapacity_;
-        const auto next = (base + 1) % grainCapacity_;
-        const auto fraction = static_cast<float>(position - std::floor(position));
-        return buffer[base] + (buffer[next] - buffer[base]) * fraction;
+        const auto before = (base + grainCapacity_ - 1) % grainCapacity_;
+        const auto after = (base + 1) % grainCapacity_;
+        const auto after2 = (base + 2) % grainCapacity_;
+        const float t = static_cast<float>(position - std::floor(position));
+        const float a = buffer[before], b = buffer[base];
+        const float c = buffer[after], d = buffer[after2];
+        const float c1 = 0.5f * (c - a);
+        const float c2 = a - 2.5f * b + 2.0f * c - 0.5f * d;
+        const float c3 = 0.5f * (d - a) + 1.5f * (b - c);
+        const float value = b + t * (c1 + t * (c2 + t * c3));
+        return std::clamp(value, std::min({a, b, c, d}),
+                                   std::max({a, b, c, d}));
     }
 
     double sampleRate_ = 48000.0;
@@ -697,7 +746,7 @@ private:
     std::size_t grainCapacity_ = 0, memoryCapacity_ = 0, pulseCapacity_ = 0;
     std::size_t grainWrite_ = 0, memoryWrite_ = 0, pulseWrite_ = 0;
     std::size_t processedSamples_ = 0, memoryStart_ = 0;
-    int attackCooldown_ = 0, memoryCooldown_ = 0, grainCountdown_ = 0, grainVoice_ = 0;
+    int attackCooldown_ = 0, memoryCooldown_ = 0, grainCountdown_ = 0;
     int memoryAge_ = -1, memoryLength_ = 1;
     bool memoryHasCapture_ = false, smoothed_ = false;
     float phase_ = 0.0f, envelope_ = 0.0f;
@@ -722,6 +771,8 @@ private:
     uint32_t noiseSeed_ = 0x8fe34ae1u;
     std::array<std::vector<float>, 2> grainsBuffer_, memoryBuffer_, pulseBuffer_;
     std::array<std::array<Resonator, 3>, 2> resonators_;
-    std::array<std::array<Grain, 2>, 2> grains_;
+    std::array<std::array<Grain, 24>, 2> grains_;
+    std::array<float, 1025> grainWindow_ {};
+    std::array<float, 2> grainNormalizer_ {1.0f, 1.0f};
 };
 } // namespace biosphere
