@@ -27,10 +27,13 @@ assert "metrics_.envelope" in ui and "metrics_.rootHz" in ui
 assert "maxTonal" in read("Tests/AnalysisSmoke.cpp")
 
 # Native preset browser must be interactive and persist a real APVTS state.
-assert len(re.findall(r'addFactory\("', library)) == 20
+catalog = read("Source/Ui/FactoryPresetCatalog.h")
+assert 'factory::build()' in library
+assert len(re.findall(r'append\("', catalog)) == 20
+assert 'std::array<Design, 80>' in catalog
 for marker in (
     "setValueNotifyingHost", "getDefaultValue()", "replaceState(restored)",
-    "copyState().createXml()", "replaceWithText", "createLegalFileName",
+    "presetState.createXml()", "replaceWithText", "createLegalFileName",
     "findChildFiles", "toggleFavorite", "load(int index)", "saveUser(",
 ):
     assert marker in library, f"Missing preset behavior {marker}"
@@ -54,4 +57,4 @@ assert "panel->setLanguage" in editor
 assert "slot->choice.changeItemText" in panels
 assert "return french;" in language and "if (!english)" in language
 assert len(re.findall(r'\{"[^"]+",\s*"[^"]+"\}', language)) > 85
-print("Phase 5 audit PASS — real DSP meters, 20 presets, user storage, browser and FR/EN")
+print("Phase 5 audit PASS — real DSP meters, 100 presets, user storage, browser and FR/EN")
