@@ -93,6 +93,7 @@ int main()
     for(int i=0;i<128;++i)need(router.assignment(i)==-1,"Clear all failed");
     need(router.learnTarget()==-1,"Learning not cancelled on clear all");
     need(router.consume(2)==-1,"CC event not cleared on clear all");
+    need(router.consumeLearnNotification()==-1,"Clear all must discard stale learn notifications");
 
     router.assign(127,3,11);
     router.receive(3,11,42);
