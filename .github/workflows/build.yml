@@ -112,7 +112,7 @@ jobs:
           killall -9 AudioComponentRegistrar >/dev/null 2>&1 || true
           sleep 4
           /usr/bin/auval -a
-          /usr/bin/auval -v aufx GBio Lbms
+          /usr/bin/auval -v aumf GBio Lbms
       - name: pluginval VST3 host compatibility (strictness 5)
         uses: Tracktion/pluginval/validate@286684f72062250fd2494681b7ebdcb721f09e0d
         with:
