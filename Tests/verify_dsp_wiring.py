@@ -59,4 +59,22 @@ assert "evolving.activity, // actual EVOLUTION" in dsp
 assert "analysis.evolutionState.store(" in processor
 assert "analysis.evolutionEnergy.store(" in processor
 assert "ecosystem_.setLivingState(" in (root / "Source/PluginEditor.cpp").read_text(encoding="utf-8")
-print(f"DSP wiring audit PASS: {len(expected)} Phase-4 APVTS parameters forwarded")
+# Guitar Intelligence: the YIN tracker must replace zero crossings, publish
+# confidence/MIDI and retune the existing HARMONIC LIFE follow-mono switch.
+pitch = (root / "Source/Dsp/GuitarPitchTracker.h").read_text(encoding="utf-8")
+editor = (root / "Source/PluginEditor.cpp").read_text(encoding="utf-8")
+panel = (root / "Source/Ui/EcosystemView.cpp").read_text(encoding="utf-8")
+assert "class GuitarPitchTracker" in pitch
+for token in ("normalized_", "candidateCount_", "attackHold_", "silenceHops_"):
+    assert token in pitch
+assert "guitarPitch_.processSample(dry[0], onset)" in dsp
+assert "guitarPitch_.frame()" in dsp
+assert "musicalIntervals" in dsp and "fixedIntervals" in dsp
+assert "p.harmonicMono ? smoothedHarmonicRoot_ : p.rootHz" in dsp
+assert "zeroCrossCounter_" not in dsp
+for key in ("pitchConfidence", "midiNote"):
+    assert f"analysis.{key}.store(" in processor
+    assert f"m.{key}.load(" in editor
+assert "metrics_.confidence" in panel
+assert "metrics_.midiNote" in panel
+print(f"DSP wiring audit PASS: {len(expected)} base APVTS controls + GUITAR INTELLIGENCE")

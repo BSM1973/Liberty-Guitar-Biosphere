@@ -112,7 +112,9 @@ void GuitarBiosphereAudioProcessorEditor::timerCallback()
         m.rhythmicActivity.load(std::memory_order_relaxed),
         m.memoryActivity.load(std::memory_order_relaxed),
         m.tonalEnergy.load(std::memory_order_relaxed),
-        m.rootHz.load(std::memory_order_relaxed)
+        m.rootHz.load(std::memory_order_relaxed),
+        m.pitchConfidence.load(std::memory_order_relaxed),
+        m.midiNote.load(std::memory_order_relaxed)
     });
     ecosystem_.setLivingState(
         m.evolutionState.load(std::memory_order_relaxed),

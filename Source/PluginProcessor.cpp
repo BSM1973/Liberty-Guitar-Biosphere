@@ -186,6 +186,8 @@ void GuitarBiosphereAudioProcessor::processBlock(juce::AudioBuffer<float>& buffe
     analysis.memoryActivity.store(values.memoryActivity, std::memory_order_relaxed);
     analysis.tonalEnergy.store(values.tonalEnergy, std::memory_order_relaxed);
     analysis.rootHz.store(values.rootHz, std::memory_order_relaxed);
+    analysis.pitchConfidence.store(values.pitchConfidence, std::memory_order_relaxed);
+    analysis.midiNote.store(values.midiNote, std::memory_order_relaxed);
     analysis.evolutionEnergy.store(values.evolutionEnergy, std::memory_order_relaxed);
     analysis.evolutionState.store(values.evolutionState, std::memory_order_relaxed);
     analysis.hostBpm.store(p.hasHostBpm ? p.hostBpm : 0.0f, std::memory_order_relaxed);

@@ -267,12 +267,27 @@ void AnalysisPanel::paint(juce::Graphics& g)
     g.drawText(tr("Racine harmonique", english_), 17, 185, 165, 16,
                juce::Justification::left);
     g.setColour(gold);
-    const auto root = metrics_.rootHz > 0.0f
-        ? juce::String(metrics_.rootHz, 1) + " Hz" : juce::String("-");
-    g.drawText(root, getWidth() - 112, 184, 95, 20, juce::Justification::centredRight);
+    juce::String detected = "-";
+    if (metrics_.rootHz > 0.0f && metrics_.midiNote >= 0
+        && metrics_.confidence >= 0.81f)
+    {
+        static constexpr std::array<const char*, 12> noteNames {
+            "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
+        };
+        const int note = juce::jlimit(0, 127, metrics_.midiNote);
+        detected = juce::String(noteNames[static_cast<std::size_t>(note % 12)])
+                   + juce::String(note / 12 - 1) + " "
+                   + juce::String(metrics_.rootHz, 0) + " Hz";
+    }
+    g.drawFittedText(detected, getWidth() - 112, 184, 95, 20,
+                     juce::Justification::centredRight, 1);
     g.setColour(muted);
     g.setFont(juce::Font(juce::FontOptions(8.5f)));
-    g.drawText(english_ ? "Live DSP measurements" : "Mesures DSP en direct",
-               17, getHeight() - 20, getWidth() - 34, 15, juce::Justification::left);
+    const auto reliability = (metrics_.rootHz > 0.0f && metrics_.confidence >= 0.81f)
+        ? (english_ ? "Pitch confidence: " : juce::String::fromUTF8("Fiabilité note : "))
+              + juce::String(juce::roundToInt(metrics_.confidence * 100.0f)) + " %"
+        : (english_ ? "No stable note" : "Aucune note stable");
+    g.drawFittedText(reliability, 17, getHeight() - 20, getWidth() - 34, 15,
+                     juce::Justification::centredLeft, 1);
 }
 } // namespace biosphere::ui
