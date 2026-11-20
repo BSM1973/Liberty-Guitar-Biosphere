@@ -8,6 +8,7 @@
 #include <vector>
 #include "ReactionMatrix.h"
 #include "EvolutionEngine.h"
+#include "GuitarPitchTracker.h"
 
 namespace biosphere
 {
@@ -62,6 +63,8 @@ struct AnalysisValues
     float memoryActivity = 0.0f, tonalEnergy = 0.0f, rootHz = 0.0f;
     float evolutionEnergy = 0.0f;
     int evolutionState = 0;
+    float pitchConfidence = 0.0f;
+    int midiNote = -1;
 };
 
 // The four macros are non-destructive multipliers: raw APVTS values never change.
@@ -105,7 +108,7 @@ public:
     {
         return { envelope_, attackActivity_, rhythmicActivity_,
                  memoryActivity_, tonalEnergy_, trackedRoot_,
-                 evolutionEnergy_, evolutionState_ };
+                 evolutionEnergy_, evolutionState_, pitchConfidence_, trackedMidiNote_ };
     }
 
     void prepare(double sampleRate, int, int channels)
@@ -125,6 +128,7 @@ public:
         }
         reactionMatrix_.prepare(sampleRate_);
         evolutionEngine_.prepare(sampleRate_);
+        guitarPitch_.prepare(sampleRate_);
         reset();
     }
 
@@ -142,10 +146,9 @@ public:
         memoryHasCapture_ = false;
         smoothed_ = false;
         wetBypass_ = 1.0f;
-        trackedRoot_ = 0.0f;
-        lastInput_ = 0.0f;
-        zeroCrossCounter_ = 0;
-        lastPeriod_ = 0;
+        guitarPitch_.reset();
+        trackedRoot_ = pitchConfidence_ = smoothedHarmonicRoot_ = 0.0f;
+        trackedMidiNote_ = -1;
         noiseSeed_ = 0x8fe34ae1u;
         reactionMatrix_.reset();
         evolutionEngine_.reset();
@@ -210,6 +213,7 @@ public:
             smoothedMix_ = p.mix;
             smoothedWidth_ = p.globalWidth;
             smoothedIntensity_ = p.globalIntensity;
+            smoothedHarmonicRoot_ = p.rootHz;
             wetBypass_ = p.bypass ? 0.0f : 1.0f;
             smoothed_ = true;
         }
@@ -297,27 +301,26 @@ public:
                 && memoryExcitation > 0.004f && previousMemoryExcitation_ <= 0.004f;
             previousMemoryExcitation_ = memoryExcitation;
 
-            // Conservative zero-crossing estimate for near-monophonic inputs:
-            // ignore implausible/unstable periods and fall back to the fixed root.
-            if (++zeroCrossCounter_ > static_cast<int>(sampleRate_ / 55.0))
-                trackedRoot_ = 0.0f;
-            if (lastInput_ <= 0.0f && dry[0] > 0.0f && envelope_ > 0.015f)
-            {
-                const int period = zeroCrossCounter_;
-                if (period > static_cast<int>(sampleRate_ / 520.0)
-                    && period < static_cast<int>(sampleRate_ / 65.0))
-                {
-                    if (lastPeriod_ == 0 || std::abs(period - lastPeriod_) < lastPeriod_ / 5)
-                    {
-                        const float newRoot = static_cast<float>(sampleRate_ / period);
-                        trackedRoot_ = trackedRoot_ > 0.0f
-                            ? 0.85f * trackedRoot_ + 0.15f * newRoot : newRoot;
-                    }
-                    lastPeriod_ = period;
-                }
-                zeroCrossCounter_ = 0;
-            }
-            lastInput_ = dry[0];
+            // GUITAR INTELLIGENCE: YIN-style periodicity tracking with
+            // attack guard, note hysteresis and confidence; analysis is done
+            // on pre-effect guitar, never on resonator/feedback return.
+            // A mixed stereo input is deliberately NOT averaged here: phase-
+            // cancelled guitars would destroy the note. The first channel is
+            // the monophonic tracking reference for both channels' harmonies.
+            guitarPitch_.processSample(dry[0], onset);
+            const auto pitch = guitarPitch_.frame();
+            trackedRoot_ = pitch.voiced ? pitch.frequencyHz : 0.0f;
+            pitchConfidence_ = pitch.voiced ? pitch.confidence : 0.0f;
+            trackedMidiNote_ = pitch.voiced ? pitch.midiNote : -1;
+            // Pitch-follow can be toggled on an existing preset without a
+            // discontinuity; 55ms glide also softens semitone transitions.
+            const float targetRoot = (p.harmonicMono && pitch.voiced
+                                      && pitch.confidence >= 0.81f)
+                ? pitch.frequencyHz : p.rootHz;
+            const float harmonicGlide = static_cast<float>(
+                1.0 - std::exp(-1.0 / (sampleRate_ * 0.055)));
+            smoothedHarmonicRoot_ += harmonicGlide
+                                    * (targetRoot - smoothedHarmonicRoot_);
 
             if ((onset || harmonicMemoryTrigger) && memoryCooldown_ == 0
                 && p.memoryActive && !freeze && p.memory > 0.0001f
@@ -377,18 +380,29 @@ public:
                 ? (pulsePosition / swingDivider) * 0.5f
                 : 0.5f + (pulsePosition - swingDivider) / (1.0f - swingDivider) * 0.5f;
 
-            const float root = (p.harmonicMono && trackedRoot_ > 0.0f) ? trackedRoot_ : p.rootHz;
+            const float root = p.harmonicMono ? smoothedHarmonicRoot_ : p.rootHz;
             const float rhythmTarget = p.pulseActive
                 ? envelope_ * (0.5f + 0.5f * std::sin(phase_)) * pulseDepth : 0.0f;
             rhythmicActivity_ += 0.007f * (std::clamp(rhythmTarget * 4.0f, 0.0f, 1.0f)
                                             - rhythmicActivity_);
-            constexpr std::array<std::array<float, 3>, 4> harmonicIntervals {{
-                {{ 1.0f, 1.5f, 2.0f }}, // fifths
-                {{ 1.0f, 2.0f, 4.0f }}, // octaves
-                {{ 1.0f, 1.25f, 1.5f }}, // thirds
-                {{ 1.0f, 1.3333333f, 1.5f }} // suspended
+            constexpr std::array<std::array<float, 3>, 4> fixedIntervals {{
+                {{ 1.0f, 1.5f, 2.0f }}, // historical fifths
+                {{ 1.0f, 2.0f, 4.0f }}, // historical octaves
+                {{ 1.0f, 1.25f, 1.5f }}, // historical thirds
+                {{ 1.0f, 1.3333333f, 1.5f }} // historical suspended
             }};
-            const auto& intervals = harmonicIntervals[static_cast<std::size_t>(p.harmonicMode)];
+            // Tracked notes use exact equal-tempered semitone relationships,
+            // not fixed detuned ratios. Existing presets with Suivi mono OFF
+            // retain their original harmonic interval spectrum.
+            constexpr std::array<std::array<float, 3>, 4> musicalIntervals {{
+                {{ 1.0f, 1.49830708f, 2.0f }}, // root + fifth (7st) + octave
+                {{ 1.0f, 2.0f, 4.0f }}, // root + octaves
+                {{ 1.0f, 1.25992105f, 1.49830708f }}, // 4st + 7st
+                {{ 1.0f, 1.33483985f, 1.49830708f }} // 5st + 7st
+            }};
+            const auto& intervals = p.harmonicMono
+                ? musicalIntervals[static_cast<std::size_t>(p.harmonicMode)]
+                : fixedIntervals[static_cast<std::size_t>(p.harmonicMode)];
             float tonalInstant = 0.0f;
             float pulseInstant = 0.0f, grainInstant = 0.0f, memoryInstant = 0.0f;
             for (int channel = 0; channel < channels; ++channel)
@@ -650,8 +664,10 @@ private:
     float memoryActivity_ = 0.0f, tonalEnergy_ = 0.0f;
     float smoothedInput_ = 1.0f, smoothedOutput_ = 1.0f, smoothedMix_ = 0.65f;
     float smoothedWidth_ = 0.8f, smoothedIntensity_ = 0.5f, wetBypass_ = 1.0f;
-    float trackedRoot_ = 0.0f, lastInput_ = 0.0f;
-    int zeroCrossCounter_ = 0, lastPeriod_ = 0;
+    GuitarPitchTracker guitarPitch_;
+    float trackedRoot_ = 0.0f, pitchConfidence_ = 0.0f;
+    float smoothedHarmonicRoot_ = 0.0f;
+    int trackedMidiNote_ = -1;
     uint32_t noiseSeed_ = 0x8fe34ae1u;
     std::array<std::vector<float>, 2> grainsBuffer_, memoryBuffer_, pulseBuffer_;
     std::array<std::array<Resonator, 3>, 2> resonators_;
