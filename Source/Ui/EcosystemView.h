@@ -55,6 +55,8 @@ public:
     {
         float envelope = 0.0f, attacks = 0.0f, rhythm = 0.0f;
         float memory = 0.0f, tonal = 0.0f, rootHz = 0.0f;
+        float confidence = 0.0f;
+        int midiNote = -1;
     };
     void setValues(Metrics metrics) { metrics_ = metrics; repaint(); }
     void setLanguage(bool english) { english_ = english; repaint(); }
