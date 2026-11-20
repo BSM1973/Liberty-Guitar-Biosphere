@@ -3,6 +3,18 @@
 
 using namespace biosphere::ui;
 
+// Keep the proven 1200 × 748 design grid. Scale the complete drawing AND
+// all direct child components together, so labels, knobs, panels, mouse
+// targets and preset browser remain aligned in the slightly larger editor.
+namespace
+{
+constexpr int designWidth = 1200;
+constexpr int designHeight = 748;
+constexpr int editorWidth = 1284;
+constexpr int editorHeight = 800;
+}
+
+
 GuitarBiosphereAudioProcessorEditor::GuitarBiosphereAudioProcessorEditor(
     GuitarBiosphereAudioProcessor& processor)
     : juce::AudioProcessorEditor(&processor),
@@ -135,7 +147,6 @@ GuitarBiosphereAudioProcessorEditor::GuitarBiosphereAudioProcessorEditor(
 
     selectEngine(processor_.getSelectedEditorPage());
     setResizable(false, false);
-    setSize(1200, 748);
     midiLearnStatus_.setJustificationType(juce::Justification::centredLeft);
     midiLearnStatus_.setColour(juce::Label::textColourId, gold);
     midiLearnStatus_.setFont(juce::Font(juce::FontOptions(9.5f)));
@@ -145,6 +156,9 @@ GuitarBiosphereAudioProcessorEditor::GuitarBiosphereAudioProcessorEditor(
     // hidden engine panels when displayed. Parameter IDs are JUCE component
     // IDs, not inferred from captions or translated labels.
     addMouseListener(this, true);
+    // Create the window once, after all child components exist, so resized()
+    // can apply the same scaling transform to every interactive child.
+    setSize(editorWidth, editorHeight);
     setLanguage(processor_.isEnglish());
     refreshPresetLabButtons();
     updateMidiStatus();
@@ -427,8 +441,14 @@ void GuitarBiosphereAudioProcessorEditor::selectEngine(int index)
 void GuitarBiosphereAudioProcessorEditor::paint(juce::Graphics& g)
 {
     g.fillAll(navy);
+    // Draw the original vetted composition in design coordinates and scale
+    // it to the new size. Text and decorations keep their relative spacing.
+    g.addTransform(juce::AffineTransform::scale(
+        static_cast<float>(getWidth()) / static_cast<float>(designWidth),
+        static_cast<float>(getHeight()) / static_cast<float>(designHeight)));
     juce::ColourGradient backdrop(panel.brighter(0.05f), 0.0f, 0.0f,
-                                  navy, static_cast<float>(getWidth()), static_cast<float>(getHeight()), false);
+                                  navy, static_cast<float>(designWidth),
+                                  static_cast<float>(designHeight), false);
     g.setGradientFill(backdrop);
     g.fillAll();
 
@@ -481,7 +501,7 @@ void GuitarBiosphereAudioProcessorEditor::paint(juce::Graphics& g)
     }
 
     g.setColour(border);
-    g.drawLine(29.0f, 102.0f, static_cast<float>(getWidth() - 29), 102.0f, 1.0f);
+    g.drawLine(29.0f, 102.0f, static_cast<float>(designWidth - 29), 102.0f, 1.0f);
 
     roundedPanel(g, { 28.0f, 577.0f, 1144.0f, 142.0f });
     heading(g, tr("MACROS DE PERFORMANCE", processor_.isEnglish()), { 47, 584, 390, 19 }, 11.0f);
@@ -536,4 +556,14 @@ void GuitarBiosphereAudioProcessorEditor::resized()
     bypass_.setBounds(1044, 675, 112, 31);
     browser_.setBounds(68, 116, 1064, 520);
     midiLearnStatus_.setBounds(880, 724, 175, 18);
+
+    // Component transforms are relative to their parent's origin in JUCE.
+    // Applying the same factor used in paint() scales every child position,
+    // font, hit area and nested panel without changing its internal layout.
+    const auto transform = juce::AffineTransform::scale(
+        static_cast<float>(getWidth()) / static_cast<float>(designWidth),
+        static_cast<float>(getHeight()) / static_cast<float>(designHeight));
+    for (int i = 0; i < getNumChildComponents(); ++i)
+        if (auto* child = getChildComponent(i))
+            child->setTransform(transform);
 }
