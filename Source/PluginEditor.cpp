@@ -106,6 +106,9 @@ GuitarBiosphereAudioProcessorEditor::GuitarBiosphereAudioProcessorEditor(
     sync_.setTooltip(juce::String::fromUTF8("Synchronisation PULSE au tempo du DAW, lorsque le tempo hôte est disponible."));
     freeze_.setTooltip(juce::String::fromUTF8("Fige le tampon MEMORY et conserve les fragments capturés."));
     bypass_.setTooltip("Contourne le traitement avec un fondu court vers la guitare brute.");
+    sync_.setComponentID("global.sync");
+    freeze_.setComponentID("global.freeze");
+    bypass_.setComponentID("global.bypass");
     syncAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
         processor_.parameters, "global.sync", sync_);
     freezeAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
@@ -133,14 +136,25 @@ GuitarBiosphereAudioProcessorEditor::GuitarBiosphereAudioProcessorEditor(
     selectEngine(processor_.getSelectedEditorPage());
     setResizable(false, false);
     setSize(1200, 748);
+    midiLearnStatus_.setJustificationType(juce::Justification::centredLeft);
+    midiLearnStatus_.setColour(juce::Label::textColourId, gold);
+    midiLearnStatus_.setFont(juce::Font(juce::FontOptions(9.5f)));
+    midiLearnStatus_.setInterceptsMouseClicks(false, false);
+    addAndMakeVisible(midiLearnStatus_);
+    // Listener sees the original mouse event on all descendants, including
+    // hidden engine panels when displayed. Parameter IDs are JUCE component
+    // IDs, not inferred from captions or translated labels.
+    addMouseListener(this, true);
     setLanguage(processor_.isEnglish());
     refreshPresetLabButtons();
+    updateMidiStatus();
     startTimerHz(30);
 }
 
 GuitarBiosphereAudioProcessorEditor::~GuitarBiosphereAudioProcessorEditor()
 {
     stopTimer();
+    removeMouseListener(this);
     setLookAndFeel(nullptr);
 }
 
@@ -150,6 +164,9 @@ void GuitarBiosphereAudioProcessorEditor::timerCallback()
     // Undo step, rather than recording a step for every automation sample.
     presetLab_.tick();
     refreshPresetLabButtons();
+    const int learned = processor_.consumeMidiLearnNotification();
+    if (learned >= 0 || processor_.midiLearnTarget() >= 0)
+        updateMidiStatus();
     const auto& m = processor_.analysis;
     analysis_.setValues({
         m.envelope.load(std::memory_order_relaxed),
@@ -208,6 +225,7 @@ void GuitarBiosphereAudioProcessorEditor::setLanguage(bool english)
     redo_.setTooltip(english ? "Redo last undone edit"
                              : juce::String::fromUTF8("Rétablir la modification annulée"));
     refreshPresetLabButtons();
+    updateMidiStatus();
     repaint();
 }
 
@@ -297,12 +315,81 @@ void GuitarBiosphereAudioProcessorEditor::initialiseGlobalControl(
         const double displayed = (percentage && maximum <= 1.0f) ? value * 100.0 : value;
         return juce::String(displayed, percentage || suffix == " dB" ? 0 : 1) + suffix;
     };
+    control.slider.setComponentID(parameterId);
     addAndMakeVisible(control.slider);
 
     jassert(processor_.parameters.getParameter(parameterId) != nullptr);
     control.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processor_.parameters, parameterId, control.slider);
     control.slider.setTooltip(juce::String::fromUTF8("Automatisation et mémorisation APVTS : ") + parameterId);
+}
+
+void GuitarBiosphereAudioProcessorEditor::mouseDown(const juce::MouseEvent& event)
+{
+    if (!event.mods.isPopupMenu()) return;
+    auto* component = event.originalComponent;
+    while (component != nullptr && component != this)
+    {
+        const auto id = component->getComponentID();
+        if (id.isNotEmpty() && processor_.parameters.getParameter(id) != nullptr)
+        {
+            showMidiMenu(*component, id);
+            return;
+        }
+        component = component->getParentComponent();
+    }
+}
+
+void GuitarBiosphereAudioProcessorEditor::showMidiMenu(
+    juce::Component& component, const juce::String& id)
+{
+    const bool english = processor_.isEnglish();
+    const int mapped = processor_.midiAssignment(id);
+    juce::PopupMenu menu;
+    menu.addItem(1, english ? "MIDI Learn: next CC"
+                            : juce::String::fromUTF8("Apprendre le prochain CC MIDI"));
+    if (mapped >= 0)
+    {
+        const juce::String name = "CC " + juce::String(
+            biosphere::midi::LearnRouter::controllerOf(mapped)) + " / "
+            + (english ? "Channel " : "Canal ")
+            + juce::String(biosphere::midi::LearnRouter::channelOf(mapped));
+        menu.addSectionHeader(name);
+    }
+    menu.addItem(2, english ? "Remove this MIDI assignment"
+                            : juce::String::fromUTF8("Effacer cette affectation MIDI"),
+                 mapped >= 0);
+    menu.addSeparator();
+    menu.addItem(3, english ? "Clear all MIDI assignments"
+                            : juce::String::fromUTF8("Effacer toutes les affectations MIDI"));
+    const juce::Component::SafePointer<GuitarBiosphereAudioProcessorEditor> safe(this);
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&component),
+        [safe, id](int chosen)
+        {
+            if (safe == nullptr) return;
+            if (chosen == 1) safe->processor_.armMidiLearn(id);
+            else if (chosen == 2) safe->processor_.clearMidiLearn(id);
+            else if (chosen == 3) safe->processor_.clearAllMidiLearn();
+            safe->updateMidiStatus();
+        });
+}
+
+void GuitarBiosphereAudioProcessorEditor::updateMidiStatus()
+{
+    const bool english = processor_.isEnglish();
+    const int target = processor_.midiLearnTarget();
+    if (target >= 0)
+    {
+        midiLearnStatus_.setText(
+            (english ? "MIDI: waiting for CC" : "MIDI : attendre un CC"),
+            juce::dontSendNotification);
+    }
+    else
+    {
+        midiLearnStatus_.setText(english ? "Right-click: MIDI Learn"
+                                        : "Clic droit : MIDI Learn",
+                                 juce::dontSendNotification);
+    }
 }
 
 void GuitarBiosphereAudioProcessorEditor::selectEngine(int index)
@@ -430,4 +517,5 @@ void GuitarBiosphereAudioProcessorEditor::resized()
     freeze_.setBounds(1044, 639, 112, 31);
     bypass_.setBounds(1044, 675, 112, 31);
     browser_.setBounds(68, 116, 1064, 520);
+    midiLearnStatus_.setBounds(880, 724, 175, 18);
 }
