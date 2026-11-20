@@ -80,10 +80,12 @@ void GuitarBiosphereAudioProcessor::processBlock(juce::AudioBuffer<float>& buffe
     // on the JUCE message thread, even when the editor is closed.
     for (const auto metadata : midiMessages)
     {
-        const auto message = metadata.getMessage();
-        if (message.isController())
-            midiRouter_.receive(message.getChannel(), message.getControllerNumber(),
-                                message.getControllerValue());
+        // Inspect the three MIDI bytes directly: copying long SysEx messages
+        // via getMessage() could allocate in the audio thread.
+        if (metadata.numBytes == 3
+            && (metadata.data[0] & 0xF0u) == 0xB0u)
+            midiRouter_.receive((metadata.data[0] & 0x0Fu) + 1,
+                                metadata.data[1], metadata.data[2]);
     }
     const int channels = getTotalNumInputChannels();
     const int samples = buffer.getNumSamples();
