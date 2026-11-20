@@ -185,12 +185,32 @@ jobs:
         run: |
           pwsh -NoProfile -File tools/windows_sign.ps1 "$env:RELEASE_VERSION"
           if ($LASTEXITCODE -ne 0) { throw 'Windows signing pipeline failed' }
-      - name: Publish signed Windows VST3 only
+      - name: Ensure Inno Setup 6 available
+        shell: pwsh
+        run: |
+          $iscc = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Inno Setup 6\ISCC.exe'
+          if (!(Test-Path -LiteralPath $iscc)) {
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed' }
+          }
+          if (!(Test-Path -LiteralPath $iscc)) { throw 'ISCC.exe missing' }
+      - name: Build and Authenticode-sign Windows Setup.exe
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          WINDOWS_SIGNING_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
+          WINDOWS_SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+        run: |
+          pwsh -NoProfile -File tools/windows_installer.ps1 -Version "$env:RELEASE_VERSION" -Signed
+          if ($LASTEXITCODE -ne 0) { throw 'Windows signed installer failed' }
+      - name: Publish signed Windows installer and VST3 archive
         id: publish
         uses: actions/upload-artifact@v4
         with:
-          name: Guitar-Biosphere-Windows-x64-AUTHENTICODE-SIGNED
-          path: release-output/*.zip
+          name: Guitar-Biosphere-Windows-x64-AUTHENTICODE-SIGNED-SETUP
+          path: |
+            release-output/*.zip
+            release-output/*-SIGNED-Setup.exe
           if-no-files-found: error
           compression-level: 0
           retention-days: 90
@@ -200,13 +220,21 @@ jobs:
           artifact-ids: ${{ steps.publish.outputs.artifact-id }}
           path: verified-windows
           merge-multiple: true
-      - name: Check exact signed Windows ZIP after publishing
+      - name: Verify exact signed Windows Setup.exe and ZIP after publishing
         shell: pwsh
         run: |
-          $source = @(Get-ChildItem release-output -Filter '*.zip' -File)
-          $downloaded = @(Get-ChildItem verified-windows -Filter '*.zip' -File)
-          if ($source.Count -ne 1 -or $downloaded.Count -ne 1) { throw 'Missing/extra ZIP artifacts' }
-          $a = (Get-FileHash $source[0].FullName -Algorithm SHA256).Hash
-          $b = (Get-FileHash $downloaded[0].FullName -Algorithm SHA256).Hash
-          if ($a -ne $b) { throw 'Windows ZIP hash changed during artifact publishing' }
-          "Windows signed VST3 published SHA256: $a" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          foreach ($glob in @('*.zip', '*-SIGNED-Setup.exe')) {
+            $source = @(Get-ChildItem release-output -Filter $glob -File)
+            $downloaded = @(Get-ChildItem verified-windows -Filter $glob -File)
+            if ($source.Count -ne 1 -or $downloaded.Count -ne 1) {
+              throw "Missing/extra released artifacts for $glob"
+            }
+            $a = (Get-FileHash $source[0].FullName -Algorithm SHA256).Hash
+            $b = (Get-FileHash $downloaded[0].FullName -Algorithm SHA256).Hash
+            if ($a -ne $b) { throw "Artifact hash changed after upload for $glob" }
+            if ($glob -like '*Setup*') {
+              $signature = Get-AuthenticodeSignature -LiteralPath $downloaded[0].FullName
+              if ($signature.Status -ne 'Valid') { throw 'Published installer failed Authenticode verification' }
+            }
+            "Windows published $glob SHA256: $a" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          }
