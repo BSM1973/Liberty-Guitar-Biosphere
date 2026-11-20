@@ -70,6 +70,7 @@ public:
     void reset() noexcept
     {
         smoothed_.fill(0.0f);
+        destinationSmoothed_.fill(0.0f);
         rise_ = release_ = 0.001f;
     }
 
@@ -126,12 +127,23 @@ public:
                 value = std::clamp(value + smoothed_[i], -1.0f, 1.0f);
             }
         }
+        // Routing a smooth signal to a different output could otherwise
+        // move its old value abruptly to a new engine. A second (fast) smooth
+        // per destination crossfades both the old and the new destination.
+        for (std::size_t dest = 0; dest < frame.destinations.size(); ++dest)
+        {
+            const float target = frame.destinations[dest];
+            const float coefficient = std::abs(target) > std::abs(destinationSmoothed_[dest])
+                ? rise_ : release_;
+            destinationSmoothed_[dest] += coefficient * (target - destinationSmoothed_[dest]);
+            frame.destinations[dest] = std::clamp(destinationSmoothed_[dest], -1.0f, 1.0f);
+        }
         return frame;
     }
 
 private:
     double sampleRate_ = 48000.0;
     float rise_ = 0.001f, release_ = 0.001f;
-    std::array<float, 8> smoothed_ {};
+    std::array<float, 8> smoothed_ {}, destinationSmoothed_ {};
 };
 } // namespace biosphere
