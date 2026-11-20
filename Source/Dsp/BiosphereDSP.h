@@ -509,7 +509,7 @@ public:
                 pulseFeedbackTone_[ch] += 0.38f * (delayed - pulseFeedbackTone_[ch]);
                 pulseBuffer_[ch][pulseWrite_] = std::tanh(dry[ch]
                         + pulseFeedbackTone_[ch] * p.pulseFeedback * 0.72f);
-                if (p.pulseActive && pulseDepth > 0.0001f)
+                if (pulseDepth > 0.0001f)
                 {
                     const float stereoPhase = channel == 1
                         ? 0.20f * p.pulseWidth : 0.0f;
@@ -520,6 +520,7 @@ public:
                         (-dry[ch] * dynamic * (1.0f - wave) + delayed * p.pulseFeedback * 0.25f);
                 }
 
+                pulseDelta *= engineGate_[0];
                 pulseInstant += std::abs(pulseDelta);
 
                 // HARMONIC LIFE: three independently tuned, bounded resonators.
@@ -561,10 +562,8 @@ public:
                 const float stereoSpread = channels == 2
                     ? (channel == 0 ? 1.0f - 0.12f * p.harmonicSpread
                                      : 1.0f + 0.12f * p.harmonicSpread) : 1.0f;
-                if (p.harmonicActive)
-                    harmonicDelta *= p.harmonic * harmonicStrength * 0.35f * stereoSpread;
-                else
-                    harmonicDelta = 0.0f;
+                harmonicDelta *= p.harmonic * harmonicStrength
+                                 * 0.35f * stereoSpread * engineGate_[1];
                 tonalInstant += std::abs(harmonicDelta);
 
                 // MUTATION: overlapping tapered grains from live circular audio.
@@ -602,8 +601,7 @@ public:
                     * (desiredGrainGain - grainNormalizer_[ch]);
                 const float stableGrain = std::tanh(
                     grainWet * grainNormalizer_[ch] * 0.85f) * 1.10f;
-                const float mutationDelta = p.mutationActive
-                    ? stableGrain * p.mutation : 0.0f;
+                const float mutationDelta = stableGrain * p.mutation * engineGate_[2];
                 grainInstant += std::abs(mutationDelta);
 
                 // MEMORY PRO: smoothstep edges avoid discontinuous changes
