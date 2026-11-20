@@ -38,6 +38,7 @@ EnginePanel::EnginePanel(juce::AudioProcessorValueTreeState& state, juce::String
                 const double display = percent && max <= 1.0f ? value * 100.0 : value;
                 return juce::String(display, (percent || suffix == " Hz") ? 0 : 1) + suffix;
             };
+            slot->dial.setComponentID(spec.parameterId);
             addAndMakeVisible(slot->dial);
 
             jassert(state.getParameter(spec.parameterId) != nullptr);
@@ -53,6 +54,7 @@ EnginePanel::EnginePanel(juce::AudioProcessorValueTreeState& state, juce::String
                 slot->choice.addItem(spec.choices[i], i + 1);
             slot->choice.setSelectedId(1, juce::dontSendNotification);
             slot->choice.setJustificationType(juce::Justification::centred);
+            slot->choice.setComponentID(spec.parameterId);
             addAndMakeVisible(slot->choice);
             jassert(state.getParameter(spec.parameterId) != nullptr);
             slot->choiceAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
@@ -64,6 +66,7 @@ EnginePanel::EnginePanel(juce::AudioProcessorValueTreeState& state, juce::String
             slot->toggle.setClickingTogglesState(true);
             slot->toggle.setToggleState(spec.initial > 0.5f, juce::dontSendNotification);
             slot->toggle.setColour(juce::TextButton::buttonOnColourId, gold.darker(0.65f));
+            slot->toggle.setComponentID(spec.parameterId);
             addAndMakeVisible(slot->toggle);
             jassert(state.getParameter(spec.parameterId) != nullptr);
             slot->buttonAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
@@ -86,6 +89,7 @@ EnginePanel::EnginePanel(juce::AudioProcessorValueTreeState& state, juce::String
     active_.setTooltip(dspAvailable_
         ? juce::String::fromUTF8("Active ou coupe ce moteur DSP (paramètre mémorisé et automatisable).")
         : juce::String::fromUTF8("Activé dans les réglages, moteur audio à développer."));
+    active_.setComponentID(activeId);
     addAndMakeVisible(active_);
     jassert(state.getParameter(activeId) != nullptr);
     activeAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
@@ -111,6 +115,7 @@ EnginePanel::EnginePanel(juce::AudioProcessorValueTreeState& state, juce::String
             route->enabled.setToggleState(true, juce::dontSendNotification);
             route->enabled.setColour(juce::TextButton::buttonColourId, raised);
             route->enabled.setColour(juce::TextButton::buttonOnColourId, gold.darker(0.60f));
+            route->enabled.setComponentID(prefix + ".active");
             addAndMakeVisible(route->enabled);
             for (int choice = 0; choice < sourceNames.size(); ++choice)
                 route->source.addItem(sourceNames[choice], choice + 1);
@@ -120,6 +125,8 @@ EnginePanel::EnginePanel(juce::AudioProcessorValueTreeState& state, juce::String
             route->source.setTooltip(juce::String::fromUTF8(
                 "Source réelle issue du signal DSP. ÉVOLUTION restera silencieuse tant que son moteur n'existe pas."));
             route->destination.setSelectedId(i + 1, juce::dontSendNotification);
+            route->source.setComponentID(prefix + ".source");
+            route->destination.setComponentID(prefix + ".destination");
             addAndMakeVisible(route->source);
             addAndMakeVisible(route->destination);
             route->amount.setSliderStyle(juce::Slider::LinearHorizontal);
@@ -129,6 +136,7 @@ EnginePanel::EnginePanel(juce::AudioProcessorValueTreeState& state, juce::String
             route->amount.setColour(juce::Slider::trackColourId, gold);
             route->amount.setColour(juce::Slider::thumbColourId, white);
             route->amount.setTooltip("Montant bipolaire -100 % à +100 % (automatisable).");
+            route->amount.setComponentID(prefix + ".amount");
             addAndMakeVisible(route->amount);
 
             route->enabledAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
