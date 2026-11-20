@@ -1,6 +1,7 @@
 #define ProductVersion GetEnv("GUITAR_BIOSPHERE_VERSION")
 #define PluginBundle GetEnv("GUITAR_BIOSPHERE_VST3_SOURCE")
 #define InstallerOutput GetEnv("GUITAR_BIOSPHERE_OUTPUT")
+#define PackageLabel GetEnv("GUITAR_BIOSPHERE_PACKAGE_LABEL")
 #if ProductVersion == ""
   #error Missing GUITAR_BIOSPHERE_VERSION
 #endif
@@ -9,6 +10,9 @@
 #endif
 #if InstallerOutput == ""
   #error Missing GUITAR_BIOSPHERE_OUTPUT
+#endif
+#if PackageLabel == ""
+  #error Missing GUITAR_BIOSPHERE_PACKAGE_LABEL
 #endif
 
 [Setup]
@@ -24,7 +28,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={uninstallexe}
 OutputDir={#InstallerOutput}
-OutputBaseFilename=Guitar-Biosphere-v{#ProductVersion}-Windows-x64-UNSIGNED-TEST
+OutputBaseFilename=Guitar-Biosphere-v{#ProductVersion}-Windows-x64-{#PackageLabel}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
