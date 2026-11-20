@@ -14,7 +14,7 @@
 #include "Ui/Localization.h"
 
 class GuitarBiosphereAudioProcessorEditor final : public juce::AudioProcessorEditor,
-                                                  private juce::Timer, private juce::MouseListener
+                                                  private juce::Timer
 {
 public:
     explicit GuitarBiosphereAudioProcessorEditor(GuitarBiosphereAudioProcessor&);
