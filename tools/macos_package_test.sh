@@ -15,6 +15,12 @@ trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/Library/Audio/Plug-Ins/Components" "$stage/Library/Audio/Plug-Ins/VST3" release-output
 /usr/bin/ditto "$au" "$stage/Library/Audio/Plug-Ins/Components/Guitar Biosphere.component"
 /usr/bin/ditto "$vst" "$stage/Library/Audio/Plug-Ins/VST3/Guitar Biosphere.vst3"
+# Local development-only ad-hoc signing: NOT Apple Developer ID, NOT notarized.
+for bundle in "$stage/Library/Audio/Plug-Ins/Components/Guitar Biosphere.component" \
+              "$stage/Library/Audio/Plug-Ins/VST3/Guitar Biosphere.vst3"; do
+  /usr/bin/codesign --force --deep --sign - "$bundle"
+  /usr/bin/codesign --verify --deep --verbose=2 "$bundle"
+done
 pkg="release-output/Guitar-Biosphere-v$version-macOS-ARM64-UNSIGNED-TEST.pkg"
 /usr/bin/pkgbuild --root "$stage" \
   --identifier "com.libertymusicsoftware.guitarbiosphere.installer" \
