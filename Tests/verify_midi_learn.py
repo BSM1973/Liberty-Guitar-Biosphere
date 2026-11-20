@@ -23,7 +23,7 @@ for token in (
     assert token in header, f"Missing processor MIDI bridge: {token}"
 for token in (
     "for (const auto metadata : midiMessages)",
-    "message.isController()", "midiRouter_.receive(",
+    "(metadata.data[0] & 0xF0u) == 0xB0u", "midiRouter_.receive(",
     "parameter->setValueNotifyingHost(", "midiRouter_.consume(i)",
     "startTimerHz(60)", 'juce::ValueTree midi("MIDI_LEARN")',
     "midiRouter_.assign(parameterIndex, channel, controller)",
