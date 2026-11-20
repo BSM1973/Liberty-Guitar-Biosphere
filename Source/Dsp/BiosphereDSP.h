@@ -6,12 +6,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <vector>
+#include "ReactionMatrix.h"
 
 namespace biosphere
 {
 // All controls are copied from APVTS at block boundaries by the processor.
-// REACTION and EVOLUTION retain separate parameter state: their modulation
-// engines are NOT implemented in Phase 4.
+// REACTION uses eight cross-engine APVTS routes; EVOLUTION remains separate.
 struct Parameters
 {
     // Legacy public host IDs — keep names/defaults for existing tests/sessions.
@@ -47,6 +47,9 @@ struct Parameters
     float memoryLength = 3.0f, memoryCapture = 0.8f, memoryRecall = 0.48f;
     float memoryReverse = 0.25f, memoryFade = 45.0f;
     int memoryRepeat = 0;
+
+    // Eight configurable links; IDs and choice indices match Phase-2 APVTS.
+    ReactionSettings reaction;
 };
 
 // Published only AFTER processing a block. The processor transfers these
@@ -115,6 +118,7 @@ public:
             memoryBuffer_[channel].assign(memoryCapacity_, 0.0f);
             pulseBuffer_[channel].assign(pulseCapacity_, 0.0f);
         }
+        reactionMatrix_.prepare(sampleRate_);
         reset();
     }
 
@@ -137,6 +141,9 @@ public:
         zeroCrossCounter_ = 0;
         lastPeriod_ = 0;
         noiseSeed_ = 0x8fe34ae1u;
+        reactionMatrix_.reset();
+        pulseSource_ = harmonicSource_ = grainSource_ = memorySource_ = 0.0f;
+        previousMemoryExcitation_ = 0.0f;
         for (auto& channel : resonators_)
             for (auto& state : channel) state = {};
         for (auto& channel : grains_)
@@ -158,6 +165,7 @@ public:
             return;
 
         const Parameters p = sanitise(mapPerformanceControls(requested));
+        reactionMatrix_.configure(p.reaction.responseMs, p.reaction.reactivity);
         const float tempo = p.hasHostBpm ? p.hostBpm : 120.0f;
         const float beatHz = tempo / 60.0f;
         constexpr std::array<float, 5> divisions { 1, 2, 3, 4, 6 };
@@ -165,13 +173,13 @@ public:
         const float rate = (p.globalSync && p.pulseSync && p.hasHostBpm)
             ? beatHz * divisions[static_cast<std::size_t>(division)] * p.globalSpeed
             : p.rateHz * p.globalSpeed;
-        const float phaseIncrement = static_cast<float>(twoPi / sampleRate_)
+        const float basePhaseIncrement = static_cast<float>(twoPi / sampleRate_)
             * std::clamp(rate, 0.08f, 24.0f);
         const float grainLengthSeconds = p.grainMs * 0.001f;
         const int grainLength = std::clamp(static_cast<int>(sampleRate_ * grainLengthSeconds),
                                            64, static_cast<int>(grainCapacity_ / 3));
-        const float effectiveDensity = std::clamp(p.mutationDensity, 1.0f, 80.0f);
-        const int grainSpacing = std::max(48, static_cast<int>(sampleRate_ / effectiveDensity));
+        // Grain spacing will be computed from the current reaction-modulated
+        // density on each grain trigger; there are no control-rate steps.
         const double grainPitch = std::exp2(static_cast<double>(p.mutationPitch) / 12.0);
         const int captureLength = std::clamp(static_cast<int>(sampleRate_ * p.memoryLength),
                                              64, static_cast<int>(sampleRate_ * 3.0));
