@@ -15,7 +15,7 @@ library = read("Source/Ui/PresetLibrary.cpp")
 test = read("Tests/FactoryPresetQuality.cpp")
 
 original = re.findall(r'^\s*append\("(\d\d - [^"]+)"', catalog, re.M)
-expanded = re.findall(r'^\s*\{\s*"(\d\d - [^"]+)",\s*\d+,\s*', catalog, re.M)
+expanded = re.findall(r'^\s*\{\s*"(\d{2,3} - [^"]+)",\s*\d+,\s*', catalog, re.M)
 assert len(original) == 20, f"Original 20 not preserved: {len(original)}"
 assert len(expanded) == 80, f"Missing expanded factory recipes: {len(expanded)}"
 assert len(set(original + expanded)) == 100
