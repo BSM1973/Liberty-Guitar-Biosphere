@@ -34,6 +34,15 @@ for name in (
 assert "p.hasHostBpm = true" in processor, "Host tempo was not forwarded"
 assert "dsp_.process(audio, channels, samples, p)" in processor, "DSP call missing"
 assert "p.bypass = enabled" in processor, "Smoothed bypass not wired"
-# REACTION and EVOLUTION are still separate, pending DSP engines.
-assert "REACTION/EVO parameters" in processor
+# REACTION runs the existing 8×4-parameter APVTS routing matrix; only
+# EVOLUTION remains reserved for a future native DSP controller.
+for name in ("react.active", "react.reactivity", "react.interaction",
+             "react.sensitivity", "react.response", "react.complexity"):
+    assert f'"{name}"' in processor, f"REACTION control missing: {name}"
+for suffix in (".active", ".source", ".destination", ".amount"):
+    assert f'prefix + "{suffix}"' in processor, f"REACTION route missing {suffix}"
+assert "p.reaction.active = enabled" in processor
+assert "ReactionMatrix reactionMatrix_" in dsp
+assert 'reactionMatrix_.tick(p.reaction, reactionSources)' in dsp
+assert '0.0f, // EVOLUTION has no DSP yet' in dsp
 print(f"DSP wiring audit PASS: {len(expected)} Phase-4 APVTS parameters forwarded")
