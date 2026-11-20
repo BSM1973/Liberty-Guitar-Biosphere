@@ -71,7 +71,10 @@ struct AnalysisValues
 // All calculations are bounded and deterministic, with no dynamic allocation.
 inline Parameters mapPerformanceControls(Parameters p) noexcept
 {
-    const auto unit = [](float value) { return std::clamp(value, 0.0f, 1.0f); };
+    const auto unit = [](float value)
+    {
+        return std::clamp(std::isfinite(value) ? value : 0.0f, 0.0f, 1.0f);
+    };
     const float growth = unit(p.macroGrowth);
     const float motion = unit(p.macroMotion);
     const float space = unit(p.macroSpace);
@@ -113,7 +116,9 @@ public:
 
     void prepare(double sampleRate, int, int channels)
     {
-        sampleRate_ = std::max(8000.0, sampleRate);
+        // Hosts may briefly report an invalid rate during audio-device changes.
+        sampleRate_ = std::isfinite(sampleRate)
+            ? std::clamp(sampleRate, 8000.0, 384000.0) : 48000.0;
         channels_ = std::clamp(channels, 1, 2);
         grainCapacity_ = static_cast<std::size_t>(std::ceil(sampleRate_ * 3.0));
         // 12 seconds: at 3 s capture + 3 repeats the underlying source is
@@ -191,7 +196,8 @@ public:
         if (channels < 1 || data[0] == nullptr || (channels == 2 && data[1] == nullptr))
             return;
 
-        const Parameters p = sanitise(mapPerformanceControls(requested));
+        // Sanitise twice, because performance macros may amplify values.
+        const Parameters p = sanitise(mapPerformanceControls(sanitise(requested)));
         reactionMatrix_.configure(p.reaction.responseMs, p.reaction.reactivity);
         const float tempo = p.hasHostBpm ? p.hostBpm : 120.0f;
         const float beatHz = tempo / 60.0f;
@@ -287,7 +293,10 @@ public:
             float level = 0.0f;
             for (int channel = 0; channel < channels; ++channel)
             {
-                raw[static_cast<std::size_t>(channel)] = data[channel][sample];
+                // Malformed upstream audio must never poison feedback buffers.
+                const float incoming = data[channel][sample];
+                raw[static_cast<std::size_t>(channel)] =
+                    std::isfinite(incoming) ? incoming : 0.0f;
                 dry[static_cast<std::size_t>(channel)] = raw[static_cast<std::size_t>(channel)]
                                                       * smoothedInput_;
                 level += std::abs(dry[static_cast<std::size_t>(channel)]);
@@ -740,7 +749,49 @@ private:
     // Defensive bounds on every numeric APVTS field before use.
     static Parameters sanitise(Parameters p) noexcept
     {
-        const auto unit = [](float value) { return std::clamp(value, 0.0f, 1.0f); };
+        const auto unit = [](float value)
+        {
+            return std::clamp(std::isfinite(value) ? value : 0.0f, 0.0f, 1.0f);
+        };
+        const Parameters defaults {};
+        const auto valid = [](float value, float fallback)
+        {
+            return std::isfinite(value) ? value : fallback;
+        };
+        p.inputGain = valid(p.inputGain, defaults.inputGain);
+        p.outputGain = valid(p.outputGain, defaults.outputGain);
+        p.rateHz = valid(p.rateHz, defaults.rateHz);
+        p.rootHz = valid(p.rootHz, defaults.rootHz);
+        p.grainMs = valid(p.grainMs, defaults.grainMs);
+        p.memoryFeedback = valid(p.memoryFeedback, defaults.memoryFeedback);
+        p.globalSpeed = valid(p.globalSpeed, defaults.globalSpeed);
+        p.hostBpm = valid(p.hostBpm, defaults.hostBpm);
+        p.harmonicDecay = valid(p.harmonicDecay, defaults.harmonicDecay);
+        p.mutationDensity = valid(p.mutationDensity, defaults.mutationDensity);
+        p.mutationPitch = valid(p.mutationPitch, defaults.mutationPitch);
+        p.memoryLength = valid(p.memoryLength, defaults.memoryLength);
+        p.memoryFade = valid(p.memoryFade, defaults.memoryFade);
+        p.reaction.reactivity = unit(p.reaction.reactivity);
+        p.reaction.interaction = unit(p.reaction.interaction);
+        p.reaction.sensitivity = unit(p.reaction.sensitivity);
+        p.reaction.complexity = unit(p.reaction.complexity);
+        p.reaction.responseMs = std::clamp(
+            valid(p.reaction.responseMs, defaults.reaction.responseMs),
+            30.0f, 500.0f);
+        for (auto& route : p.reaction.routes)
+        {
+            route.source = std::clamp(route.source, 0, 7);
+            route.destination = std::clamp(route.destination, 0, 7);
+            route.amount = std::clamp(valid(route.amount, 0.0f), -1.0f, 1.0f);
+        }
+        p.evolution.rate = std::clamp(valid(p.evolution.rate, defaults.evolution.rate),
+                                      0.25f, 4.0f);
+        p.evolution.intensity = unit(p.evolution.intensity);
+        p.evolution.sensitivity = unit(p.evolution.sensitivity);
+        p.evolution.stability = unit(p.evolution.stability);
+        p.evolution.complexity = unit(p.evolution.complexity);
+        p.evolution.recovery = std::clamp(
+            valid(p.evolution.recovery, defaults.evolution.recovery), 0.25f, 10.0f);
         p.inputGain = std::clamp(p.inputGain, 0.0f, 8.0f);
         p.outputGain = std::clamp(p.outputGain, 0.0f, 8.0f);
         p.mix = unit(p.mix);
