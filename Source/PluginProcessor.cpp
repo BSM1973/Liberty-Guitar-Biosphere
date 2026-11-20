@@ -35,14 +35,15 @@ GuitarBiosphereAudioProcessor::GuitarBiosphereAudioProcessor()
     // The audio callback never builds juce::Strings or touches host setters.
     for (auto* parameter : getParameters())
         if (auto* identified = dynamic_cast<juce::AudioProcessorParameterWithID*>(parameter))
-        {
-            if (midiParameterCount_ >= biosphere::midi::LearnRouter::maximumParameters)
-                break;
-            midiParameterIds_[static_cast<std::size_t>(midiParameterCount_)] =
-                identified->getParameterID();
-            midiParameters_[static_cast<std::size_t>(midiParameterCount_)] = identified;
-            ++midiParameterCount_;
-        }
+            if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*>(parameter))
+            {
+                if (midiParameterCount_ >= biosphere::midi::LearnRouter::maximumParameters)
+                    break;
+                midiParameterIds_[static_cast<std::size_t>(midiParameterCount_)] =
+                    identified->getParameterID();
+                midiParameters_[static_cast<std::size_t>(midiParameterCount_)] = ranged;
+                ++midiParameterCount_;
+            }
     jassert(midiParameterCount_ == 97);
     startTimerHz(60);
 }
