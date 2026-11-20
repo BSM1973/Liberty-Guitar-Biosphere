@@ -90,7 +90,7 @@ jobs:
       - name: Unit tests
         run: ctest --test-dir build -C Release --output-on-failure
       - name: pluginval VST3 + AU compatibility (strictness 5)
-        uses: Tracktion/pluginval/validate@develop
+        uses: Tracktion/pluginval/validate@286684f72062250fd2494681b7ebdcb721f09e0d
         with:
           pluginval-version: v2.0.0-beta3
           plugins: |
@@ -127,7 +127,7 @@ jobs:
       - name: Unit tests
         run: ctest --test-dir build -C Release --output-on-failure
       - name: pluginval Windows VST3 compatibility (strictness 5)
-        uses: Tracktion/pluginval/validate@develop
+        uses: Tracktion/pluginval/validate@286684f72062250fd2494681b7ebdcb721f09e0d
         with:
           pluginval-version: v2.0.0-beta3
           plugins: |
