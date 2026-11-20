@@ -9,6 +9,27 @@ GuitarBiosphereAudioProcessor::GuitarBiosphereAudioProcessor()
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       parameters(*this, nullptr, "BIOSPHERE", makeParameterLayout())
 {
+    // Initialized once; route automation reads these atomics directly in the
+    // audio callback without building JUCE Strings or allocating memory.
+    static constexpr const char* routeIds[8][4] = {
+        {"react.route1.active", "react.route1.source", "react.route1.destination", "react.route1.amount"},
+        {"react.route2.active", "react.route2.source", "react.route2.destination", "react.route2.amount"},
+        {"react.route3.active", "react.route3.source", "react.route3.destination", "react.route3.amount"},
+        {"react.route4.active", "react.route4.source", "react.route4.destination", "react.route4.amount"},
+        {"react.route5.active", "react.route5.source", "react.route5.destination", "react.route5.amount"},
+        {"react.route6.active", "react.route6.source", "react.route6.destination", "react.route6.amount"},
+        {"react.route7.active", "react.route7.source", "react.route7.destination", "react.route7.amount"},
+        {"react.route8.active", "react.route8.source", "react.route8.destination", "react.route8.amount"}
+    };
+    for (std::size_t i = 0; i < reactionHandles_.size(); ++i)
+    {
+        auto& handles = reactionHandles_[i];
+        handles.active = parameters.getRawParameterValue(routeIds[i][0]);
+        handles.source = parameters.getRawParameterValue(routeIds[i][1]);
+        handles.destination = parameters.getRawParameterValue(routeIds[i][2]);
+        handles.amount = parameters.getRawParameterValue(routeIds[i][3]);
+        jassert(handles.active && handles.source && handles.destination && handles.amount);
+    }
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout
@@ -134,14 +155,14 @@ void GuitarBiosphereAudioProcessor::processBlock(juce::AudioBuffer<float>& buffe
     p.reaction.sensitivity = value("react.sensitivity");
     p.reaction.responseMs = value("react.response");
     p.reaction.complexity = value("react.complexity");
-    for (int index = 0; index < 8; ++index)
+    for (std::size_t index = 0; index < reactionHandles_.size(); ++index)
     {
-        const juce::String prefix = "react.route" + juce::String(index + 1);
-        auto& route = p.reaction.routes[static_cast<std::size_t>(index)];
-        route.active = value((prefix + ".active").toRawUTF8()) >= 0.5f;
-        route.source = static_cast<int>(value((prefix + ".source").toRawUTF8()));
-        route.destination = static_cast<int>(value((prefix + ".destination").toRawUTF8()));
-        route.amount = value((prefix + ".amount").toRawUTF8());
+        const auto& handles = reactionHandles_[index];
+        auto& route = p.reaction.routes[index];
+        route.active = handles.active->load(std::memory_order_relaxed) >= 0.5f;
+        route.source = static_cast<int>(handles.source->load(std::memory_order_relaxed));
+        route.destination = static_cast<int>(handles.destination->load(std::memory_order_relaxed));
+        route.amount = handles.amount->load(std::memory_order_relaxed);
     }
 
     // EVOLUTION is not implemented yet. Its route source is deliberately 0.
