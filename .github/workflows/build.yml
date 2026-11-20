@@ -31,6 +31,14 @@ jobs:
         run: |
           c++ -std=c++20 -O2 -Wall -Wextra -Werror -ISource Tests/ReactionRouting.cpp -o biosphere-reaction-tests
           ./biosphere-reaction-tests
+      - name: Render all 100 factory patches and test preset history
+        run: |
+          c++ -std=c++20 -O2 -Wall -Wextra -Werror -ISource Tests/FactoryPresetQuality.cpp -o biosphere-factory-preset-tests
+          ./biosphere-factory-preset-tests
+          c++ -std=c++20 -O2 -Wall -Wextra -Werror -ISource Tests/PresetHistorySmoke.cpp -o biosphere-preset-history-tests
+          ./biosphere-preset-history-tests
+      - name: Audit 100-patch catalog and A/B/Undo/Redo wiring
+        run: python3 Tests/verify_phase10.py
       - name: Stress SOUND ENGINES PRO and parameter-transition continuity
         run: |
           c++ -std=c++20 -O2 -Wall -Wextra -Werror -ISource Tests/SoundEnginesPro.cpp -o biosphere-sound-engines-pro
