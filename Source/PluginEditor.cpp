@@ -114,6 +114,9 @@ void GuitarBiosphereAudioProcessorEditor::timerCallback()
         m.tonalEnergy.load(std::memory_order_relaxed),
         m.rootHz.load(std::memory_order_relaxed)
     });
+    ecosystem_.setLivingState(
+        m.evolutionState.load(std::memory_order_relaxed),
+        m.evolutionEnergy.load(std::memory_order_relaxed));
     // Host position and live input/output levels are drawn in the header.
     repaint(960, 17, 240, 76);
 }
