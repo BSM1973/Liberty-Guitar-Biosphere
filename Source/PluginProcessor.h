@@ -12,6 +12,8 @@ struct SharedAnalysisState
     std::atomic<float> envelope {0.0f}, attacks {0.0f};
     std::atomic<float> rhythmicActivity {0.0f}, memoryActivity {0.0f};
     std::atomic<float> tonalEnergy {0.0f}, rootHz {0.0f};
+    std::atomic<float> pitchConfidence {0.0f};
+    std::atomic<int> midiNote {-1};
     std::atomic<float> inputPeak {0.0f}, outputPeak {0.0f};
     std::atomic<float> hostBpm {0.0f};
     std::atomic<float> evolutionEnergy {0.0f};
