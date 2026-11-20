@@ -52,6 +52,44 @@ Not yet implemented:
 
 No feature listed above as pending is represented as complete in the UI.
 
+## MIDI LEARN + NATIVE INSTALLERS — Phase 11 extensions
+
+**Right-click any existing DSP parameter control** in PULSE, HARMONIC LIFE,
+MUTATION, MEMORY, REACTION or EVOLUTION, or on a macro/master control.
+Choose **Apprendre le prochain CC MIDI / MIDI Learn: next CC**, then move a
+physical MIDI knob or fader. The device must be routed to the Guitar Biosphere
+plugin's MIDI input in the DAW.
+
+- MIDI channel **1–16** and CC **0–127** are learned together and displayed
+  in the context menu on later right-clicks.
+- The same menu can remove that assignment or clear all mappings.
+- Mappings are saved as a separate **MIDI_LEARN** child in the full DAW
+  project state (not in factory/user preset XML). They remain available when
+  the editor is closed and do not affect the existing **97 host APVTS IDs**.
+- The audio callback only transfers CC values through a lock-free fixed-size
+  queue; a **60 Hz message-thread timer** calls the host-notifying parameter
+  setter. MIDI learning is control-rate, **not sample accurate**. Incoming
+  MIDI remains intact; Guitar Biosphere does not generate MIDI notes.
+- Full-state A/B snapshots intentionally exclude MIDI_LEARN so comparison
+  and Undo/Redo do not unexpectedly reassign hardware controls.
+- No additional plugin GUI panels/scrollbars; the status line occupies a
+  previously empty footer region and uses FR or EN.
+
+**Installers for technical testing (unsigned):**
+
+- **macOS Apple Silicon .pkg** installs the AU at
+  /Library/Audio/Plug-Ins/Components and VST3 at
+  /Library/Audio/Plug-Ins/VST3; GitHub Actions builds and checks its payload.
+- **Windows x64 .exe** built with Inno Setup 6 installs VST3 under
+  C:\Program Files\Common Files\VST3; selectable French and English
+  installer languages, standard uninstall entry, and a silent install
+  verification on an ephemeral GitHub runner.
+- Both are published as **UNSIGNED-TEST** Actions artifacts after all native
+  tests and validator checks, not commercial customer packages.
+- The separate **commercial-release.yml** signs and notarizes the macOS
+  .pkg via Apple Developer ID and Authenticode-signs the Windows VST3 **and
+  .exe installer**, but only after real DAW/manual acceptance and certificates.
+
 ## VALIDATION PREMIUM — Phase 11
 
 **Status:** DSP hardening integrated; the release candidate is not yet a
