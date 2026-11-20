@@ -93,13 +93,25 @@ jobs:
         run: cmake --build build --config Release --parallel 3
       - name: Unit tests
         run: ctest --test-dir build -C Release --output-on-failure
-      - name: pluginval VST3 + AU compatibility (strictness 5)
+      - name: Register built Audio Unit and validate with Apple's auval
+        shell: bash
+        run: |
+          set -euo pipefail
+          built="build/GuitarBiosphere_artefacts/Release/AU/Guitar Biosphere.component"
+          target="$HOME/Library/Audio/Plug-Ins/Components/Guitar Biosphere.component"
+          mkdir -p "$(dirname "$target")"
+          /usr/bin/ditto "$built" "$target"
+          /usr/bin/codesign --verify --deep --verbose=2 "$target"
+          killall -9 AudioComponentRegistrar >/dev/null 2>&1 || true
+          sleep 4
+          /usr/bin/auval -a
+          /usr/bin/auval -v aufx GBio Lbms
+      - name: pluginval VST3 host compatibility (strictness 5)
         uses: Tracktion/pluginval/validate@286684f72062250fd2494681b7ebdcb721f09e0d
         with:
           pluginval-version: v2.0.0-beta3
           plugins: |
             build/GuitarBiosphere_artefacts/Release/VST3/*.vst3
-            build/GuitarBiosphere_artefacts/Release/AU/*.component
           strictness-level: '5'
           args: '--skip-gui-tests --timeout-ms 120000'
           report-dir: ${{ runner.temp }}/guitar-biosphere-pluginval
